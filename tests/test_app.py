@@ -333,7 +333,7 @@ class AppTests(unittest.TestCase):
         self.page.locator('[data-confirm]').click()
         self.assertIn('保存失败',self.messages[-1])
         self.assertEqual(self.raw(),before)
-        expect(self.page.locator('.drawer')).to_contain_text('2026-11-15')
+        expect(self.page.locator('.drawer')).to_contain_text('2026/11/15')
         expect(self.page.locator('.drawer')).to_contain_text('暂无付款记录')
 
     def test_failed_rollback_keeps_recovery_journal(self):

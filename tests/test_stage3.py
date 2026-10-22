@@ -131,7 +131,7 @@ class StageThreeTests(unittest.TestCase):
         self.assertEqual(state['snapshot']['date'],'2026-10-21')
         self.assertEqual(len(self.page.fx_requests),2)
         self.navigate('settings')
-        expect(self.page.locator('#fxRateDate')).to_contain_text('2026-10-21')
+        expect(self.page.locator('#fxRateDate')).to_contain_text('2026/10/21')
         expect(self.page.locator('#fxFetchedAt')).not_to_have_text('')
         expect(self.page.locator('#fxStatus')).to_contain_text('缓存')
         expect(self.page.locator('.fx-panel')).to_contain_text('参考')
@@ -172,7 +172,7 @@ class StageThreeTests(unittest.TestCase):
         self.assertTrue(self.state()['error'])
         self.navigate('settings')
         expect(self.page.locator('#fxStatus')).to_contain_text('缓存')
-        expect(self.page.locator('#fxRateDate')).to_contain_text('2026-10-19')
+        expect(self.page.locator('#fxRateDate')).to_contain_text('2026/10/19')
         self.assertTrue(any(word in self.page.locator('#fxStatus').inner_text() for word in ['过期','旧','失败','离线']))
 
     def test_failed_manual_refresh_preserves_last_success_and_data(self):

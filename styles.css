@@ -221,3 +221,98 @@ body.dark .service-suggestion:hover,body.dark .service-suggestion.is-active,body
   .stats-share-label>.stats-service{flex:1 1 50%}
   .stats-share-label>.stats-service+strong{max-width:50%}
 }
+/* Stage five: preserve the light palette and complete the dark appearance. */
+:root{color-scheme:light}
+:root[data-theme=dark]{
+  color-scheme:dark;
+  --dark-bg:#141a23;
+  --dark-surface:#1c2531;
+  --dark-input:#18212c;
+  --dark-raised:#253346;
+  --dark-hover:#29394d;
+  --dark-border:#354355;
+  --dark-text:#e8edf5;
+  --dark-muted:#b1bed0;
+  --dark-soft:#a3b2c6;
+  --dark-accent:#adcbf2;
+  --dark-error:#f1b1bc;
+  color:var(--dark-text);
+  background:var(--dark-bg);
+}
+html[data-theme=dark] body{background:var(--dark-bg);color:var(--dark-text)}
+html[data-theme=dark] :is(.sidebar,.card,.modal,.drawer,.mobile-summary,.mobile-subscriptions,.pick-item,.service-suggestions,.service-suggestion){background:var(--dark-surface);color:var(--dark-text);border-color:var(--dark-border)}
+html[data-theme=dark] :is(.brand,.top h1,.section-title h2,.modal-head h2,.metric,.stats-metric){color:var(--dark-text)}
+html[data-theme=dark] :is(.muted,.sub,.small,.note,.card-title,.bar-label,.table th,.empty,.stats-empty,.stats-chart-label,.stats-chart-value,.stats-chart-partial,.stats-chart-unknown,.payment-fx,.fx-status,.fx-status dt,.suggestion-empty,.logo-upload-status,.field label,.detail-row>span:first-child,.suggestion-copy .small){color:var(--dark-muted)}
+html[data-theme=dark] :is(.table td,.table th,.settings-row,.detail-row,.payment,.summary-next,.mobile-subscription,.reminder-item+.reminder-item){border-color:var(--dark-border)}
+html[data-theme=dark] :is(.search,.select,.field input,.field select){background:var(--dark-input);border-color:#65768c;color:var(--dark-text)}
+html[data-theme=dark] input::placeholder{color:var(--dark-soft);opacity:1}
+html[data-theme=dark] :is(input,select):focus{border-color:var(--dark-accent);outline:2px solid var(--dark-accent);outline-offset:1px}
+html[data-theme=dark] button:focus-visible{outline-color:var(--dark-accent)}
+html[data-theme=dark] .nav button{color:var(--dark-muted)}
+html[data-theme=dark] .nav button.active{background:var(--dark-raised);color:#c6ddfa}
+html[data-theme=dark] :is(.nav button:hover,.table tbody tr:hover,.mobile-subscription:hover,.pick-item:hover,.service-suggestion:hover,.service-suggestion.is-active,.service-suggestion[aria-selected=true]){background:var(--dark-hover)}
+html[data-theme=dark] .primary{background:#9abbe5;color:#152236}
+html[data-theme=dark] .primary:hover{background:#b2cef1}
+html[data-theme=dark] .secondary{background:var(--dark-input);color:var(--dark-text);border-color:#65768c}
+html[data-theme=dark] .secondary:hover{background:var(--dark-hover);border-color:#8dabc9}
+html[data-theme=dark] :is(.iconbtn,.linkbtn){color:var(--dark-accent)}
+html[data-theme=dark] .iconbtn:hover{background:var(--dark-hover);border-radius:8px}
+html[data-theme=dark] :is(.reminders,.detail-price,.logo-picker,.storage-notice,.stats-explanation,.fx-panel,.picker-current){background:var(--dark-raised);border-color:var(--dark-border)}
+html[data-theme=dark] :is(.notice,.stats-explanation){color:#b8d1f3}
+html[data-theme=dark] .logo-picker{border-color:#819ab8}
+/* Keep authentic black and colored brand marks on a neutral light tile. */
+html[data-theme=dark] img.logo{background:#f3f6fb}
+html[data-theme=dark] .logo.fallback{background:#2e3e53;color:#c0d0e4}
+html[data-theme=dark] .logo-modal .pick-item[aria-pressed=true]{background:var(--dark-hover);border-color:#9abbe5}
+html[data-theme=dark] .tag{background:#203b34;color:#b0e2ce}
+html[data-theme=dark] .tag.off{background:#303c4c;color:#c8d3e2}
+html[data-theme=dark] .tag.failed{background:#472d38;color:var(--dark-error)}
+html[data-theme=dark] .pill{background:#304157;color:#c5daf6}
+html[data-theme=dark] :is(.stats-filter-error,.logo-error){color:var(--dark-error)}
+html[data-theme=dark] [data-delete]{color:var(--dark-error)!important}
+html[data-theme=dark] .calendar-cell{border-color:var(--dark-border)}
+html[data-theme=dark] .calendar-event{background:#304157;color:#d2e3fb;border-color:#536c8c}
+html[data-theme=dark] .calendar-event:hover{background:#3b5270}
+html[data-theme=dark] :is(.bar,.stats-bar,.stats-share-track>div){background:#809fc7}
+html[data-theme=dark] .bar.current{background:#bdd5f5}
+html[data-theme=dark] .stats-share-track{background:#354355}
+html[data-theme=dark] :is(.overlay,.drawer-overlay){background:rgba(0,0,0,.58)}
+html[data-theme=dark] .service-suggestions{box-shadow:0 6px 18px rgba(0,0,0,.2)}
+/* Longer translated labels may wrap while controls keep their existing spacing. */
+.top>div,.modal-head h2,.drawer-header>strong,.settings-row>label{min-width:0;overflow-wrap:anywhere}
+.top>.primary{flex-shrink:0;max-width:52%}
+.modal-head{gap:12px}
+.modal-head>.iconbtn,.drawer-header>.iconbtn{flex-shrink:0}
+.settings-row .select{min-width:0}
+@media(max-width:720px){
+  .nav button{overflow-wrap:anywhere}
+  html:not([lang=zh-CN]) .summary-next{grid-template-columns:minmax(75px,.65fr) minmax(0,1fr)}
+  .summary-next>.small:first-child{overflow-wrap:anywhere}
+  .mobile-subscriptions .section-title h2{flex:1;min-width:0}
+  .mobile-subscriptions .section-title .linkbtn{max-width:50%;text-align:right;overflow-wrap:anywhere}
+  .detail-row>strong{max-width:65%;overflow-wrap:anywhere;text-align:right}
+  .month-switch{gap:6px}
+  .calendar-cell{min-width:0}
+  .calendar-event{font-size:9px}
+}
+.metric-unit{font-size:15px;color:#91a0b4}
+.renewal-metric{font-size:24px}
+.reminder-title{font-weight:650;margin-bottom:8px}
+.reminder-name{font-size:13px}
+.calendar-weekday{text-align:center}
+html[data-theme=dark] .metric-unit{color:var(--dark-muted)}
+/* Readable light text keeps the original white surfaces and pale blue fills. */
+html:not([data-theme=dark]) :is(.muted,.sub,.small,.note,.card-title,.bar-label,.table th,.empty,.stats-empty,.stats-chart-label,.stats-chart-value,.stats-chart-partial,.stats-chart-unknown,.payment-fx,.fx-status,.fx-status dt,.suggestion-empty,.logo-upload-status,.field label,.detail-row>span:first-child,.suggestion-copy .small,.metric-unit){color:#637187}
+html:not([data-theme=dark]) .primary{color:#152236}
+html:not([data-theme=dark]) .nav button.active{color:#426b9f}
+html:not([data-theme=dark]) :is(.notice,.stats-explanation,.calendar-event){color:#426b9f}
+html:not([data-theme=dark]) .linkbtn{color:#3f6da7}
+html:not([data-theme=dark]) .pill{color:#4c6791}
+html:not([data-theme=dark]) .tag{color:#367561}
+html:not([data-theme=dark]) .tag.off{color:#637187}
+html:not([data-theme=dark]) .tag.failed{color:#945f5f}
+html:not([data-theme=dark]) :is(.stats-filter-error,.logo-error){color:#945f5f}
+html:not([data-theme=dark]) [data-delete]{color:#945f5f!important}
+html:not([data-theme=dark]) .logo.fallback{color:#6c7e96}
+html:not([data-theme=dark]) input::placeholder{color:#637187;opacity:1}
+html:not([data-theme=dark]) :is(button,input,select):focus-visible{outline:2px solid #557fb4;outline-offset:3px}
