@@ -118,17 +118,17 @@ body.dark .tag.failed{background:#3c2e37;color:#e2a0a0}
 .stats-original-totals{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
 .stats-payments .payment>div{flex:1;line-height:1.6}
 .stats-payments .payment>strong{font-size:13px;max-width:45%;text-align:right;overflow-wrap:anywhere}
-.fx-panel{margin-top:16px;padding:16px;border:1px solid #e5eefc;background:#f7faff;border-radius:13px;min-width:0}
-.fx-panel .section-title{gap:12px;margin-bottom:10px;flex-wrap:wrap}
-.fx-panel .section-title h2{font-size:15px}
-.fx-panel .note{margin-bottom:0;overflow-wrap:anywhere}
+.fx-panel,.pwa-panel{margin-top:16px;padding:16px;border:1px solid #e5eefc;background:#f7faff;border-radius:13px;min-width:0}
+:is(.fx-panel,.pwa-panel) .section-title{gap:12px;margin-bottom:10px;flex-wrap:wrap}
+:is(.fx-panel,.pwa-panel) .section-title h2{font-size:15px}
+:is(.fx-panel,.pwa-panel) .note{margin-bottom:0;overflow-wrap:anywhere}
 .fx-status{font-size:12px;line-height:1.9;color:#6d839f;overflow-wrap:anywhere}
 .fx-status dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:5px 14px;margin:0}
 .fx-status dt{color:#8b98aa}
 .fx-status dd{margin:0;min-width:0}
 .payment-fx{font-size:11px;line-height:1.7;color:#8b98aa;overflow-wrap:anywhere;margin-top:4px}
 .form-grid>.category-field{grid-column:2/-1}
-body.dark .stats-explanation,body.dark .fx-panel{background:#263b58;border-color:#2b3a4d}
+body.dark .stats-explanation,body.dark .fx-panel,body.dark .pwa-panel{background:#263b58;border-color:#2b3a4d}
 body.dark .stats-share-track{background:#2b3a4d}
 body.dark .stats-bar{background:#7098ce}
 body.dark .stats-share-track>div{background:#7098ce}
@@ -149,7 +149,7 @@ body.dark .stats-share-track>div{background:#7098ce}
   .stats-chart-value{font-size:9px}
   .stats-share-label{gap:10px}
   .stats-share-label>strong{max-width:56%;overflow-wrap:anywhere}
-  .fx-panel{padding:13px}
+  .fx-panel,.pwa-panel{padding:13px}
   .fx-status dl{grid-template-columns:1fr;gap:1px}
   .fx-status dd{margin-bottom:5px}
 }
@@ -257,7 +257,7 @@ html[data-theme=dark] .secondary{background:var(--dark-input);color:var(--dark-t
 html[data-theme=dark] .secondary:hover{background:var(--dark-hover);border-color:#8dabc9}
 html[data-theme=dark] :is(.iconbtn,.linkbtn){color:var(--dark-accent)}
 html[data-theme=dark] .iconbtn:hover{background:var(--dark-hover);border-radius:8px}
-html[data-theme=dark] :is(.reminders,.detail-price,.logo-picker,.storage-notice,.stats-explanation,.fx-panel,.picker-current){background:var(--dark-raised);border-color:var(--dark-border)}
+html[data-theme=dark] :is(.reminders,.detail-price,.logo-picker,.storage-notice,.stats-explanation,.fx-panel,.pwa-panel,.picker-current){background:var(--dark-raised);border-color:var(--dark-border)}
 html[data-theme=dark] :is(.notice,.stats-explanation){color:#b8d1f3}
 html[data-theme=dark] .logo-picker{border-color:#819ab8}
 /* Keep authentic black and colored brand marks on a neutral light tile. */
@@ -316,3 +316,65 @@ html:not([data-theme=dark]) [data-delete]{color:#945f5f!important}
 html:not([data-theme=dark]) .logo.fallback{color:#6c7e96}
 html:not([data-theme=dark]) input::placeholder{color:#637187;opacity:1}
 html:not([data-theme=dark]) :is(button,input,select):focus-visible{outline:2px solid #557fb4;outline-offset:3px}
+/* Stage six: one quiet motion rhythm; state changes do not replay on every render. */
+:root{--motion-fast:140ms;--motion-normal:220ms;--motion-slow:280ms;--motion-ease:cubic-bezier(.2,.7,.2,1);--viewport-height:100vh;--viewport-offset:0px}
+@supports(height:100dvh){:root{--viewport-height:100dvh}}
+/* Theme foreground and background change as a pair to preserve contrast throughout. */
+html,body,.shell,:is(.sidebar,.card,.modal,.drawer,.mobile-summary,.mobile-subscriptions,.calendar-cell,.stats-share-track,.reminders,.detail-price,.fx-panel,.pwa-panel,.picker-current){transition:none}
+html[data-theme-changing],html[data-theme-changing] *{transition-property:transform,opacity!important}
+:is(.primary,.secondary,.iconbtn,.linkbtn,.nav button,.mobile-subscription,.pick-item,.service-suggestion,.calendar-event,.table tbody tr){transition:background-color var(--motion-fast) ease,color var(--motion-fast) ease,border-color var(--motion-fast) ease,transform var(--motion-fast) var(--motion-ease),opacity var(--motion-fast) ease}
+:is(.primary,.secondary,.iconbtn,.pick-item,.nav button,.calendar-event):active:not(:disabled){transform:translateY(1px)}
+:is(.search,.select,.field input,.field select){transition:background-color var(--motion-normal) ease,color var(--motion-normal) ease,border-color var(--motion-fast) ease}
+.modal,.drawer{animation:none}
+.sumi-enter-view{animation:sumi-page-in var(--motion-normal) var(--motion-ease)}
+.sumi-enter-nav{animation:sumi-fade-in var(--motion-fast) ease}
+.sumi-enter-overlay{animation:sumi-fade-in var(--motion-normal) ease}
+.sumi-enter-overlay>.modal{animation:sumi-modal-in var(--motion-normal) var(--motion-ease)}
+.sumi-enter-overlay>.drawer{animation:sumi-drawer-in var(--motion-slow) var(--motion-ease)}
+.sumi-enter-view :is(.bar,.stats-bar){animation:sumi-chart-in var(--motion-slow) var(--motion-ease);transform-origin:center bottom}
+.sumi-enter-view .stats-share-track>div{animation:sumi-share-in var(--motion-slow) var(--motion-ease);transform-origin:left center}
+.sumi-enter-view :is(.table tbody tr:nth-child(-n+8),.mobile-subscription){animation:sumi-list-in var(--motion-normal) var(--motion-ease)}
+.sumi-theme-change{animation:sumi-theme-in var(--motion-normal) ease}
+.bar,.stats-bar{transition:height var(--motion-slow) var(--motion-ease),background-color var(--motion-normal) ease}
+.stats-share-track>div{transition:width var(--motion-slow) var(--motion-ease),background-color var(--motion-normal) ease}
+@keyframes sumi-page-in{from{opacity:.55;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes sumi-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes sumi-list-in{from{opacity:.7;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+@keyframes sumi-chart-in{from{transform:scaleY(.94)}to{transform:scaleY(1)}}
+@keyframes sumi-share-in{from{transform:scaleX(.94)}to{transform:scaleX(1)}}
+@keyframes sumi-theme-in{from{opacity:.92}to{opacity:1}}
+/* Fixed overlays follow the visible viewport, including the on-screen keyboard. */
+.overlay,.drawer-overlay{top:var(--viewport-offset);bottom:auto;height:var(--viewport-height)}
+.modal{max-height:min(94vh,calc(var(--viewport-height) - 36px));overscroll-behavior:contain;scroll-padding-block:18px}
+#pickerOverlay .logo-modal{max-height:calc(var(--viewport-height) - 32px)}
+.drawer{overscroll-behavior:contain;scroll-padding-block:20px}
+.logo-modal .picker-grid{overscroll-behavior:contain}
+.modal-actions{flex-wrap:wrap}
+.modal-actions>button{max-width:100%;overflow-wrap:anywhere}
+html[data-keyboard=open] .sidebar{visibility:hidden;pointer-events:none}
+html[data-keyboard=open] :is(.overlay,.drawer-overlay){transition:none}
+@media(max-width:720px){
+  .shell .main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .sidebar{padding-left:max(5px,env(safe-area-inset-left,0px));padding-right:max(5px,env(safe-area-inset-right,0px))}
+  .settings-row>label{flex:1 1 140px}
+  .settings-row>.select{max-width:100%}
+  .month-switch>strong{min-width:0;overflow-wrap:anywhere;text-align:center}
+  .stats-filters .field{min-width:min(100%,125px)}
+}
+@media(max-width:420px){
+  #pickerOverlay .logo-modal{max-height:calc(var(--viewport-height) - 24px)}
+  .drawer{padding-left:20px;padding-right:20px}
+  .detail-row>strong{max-width:62%}
+  .logo-actions{flex-wrap:wrap}
+}
+/* iOS focuses small fields with an automatic zoom; retain readable 16px touch inputs. */
+@media(pointer:coarse) and (max-width:1050px){
+  :is(.search,.select,.field input,.field select){font-size:16px}
+}
+html[data-motion=reduce],html[data-motion=reduce] *,html[data-motion=reduce] *::before,html[data-motion=reduce] *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+
+/* Hidden async states and file controls must stay hidden even with component display rules. */
+[hidden]{display:none!important}

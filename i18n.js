@@ -22,20 +22,47 @@ const SumiI18n = (() => {
   const interpolate = (template, params) => template.replace(/\{([\w]+)\}/g,(_,key)=>Object.hasOwn(params,key) && params[key] != null ? String(params[key]) : '');
   function create({messages = globalThis.SumiMessages || {}, errors = globalThis.SumiErrorMessages || {}, language = 'zh-CN'} = {}) {
     let current = normalize(language);
+    // Constructing Intl formatters dominates repeated table/calendar rendering.
+    // Keep a small LRU per translator, including the locale and every option.
+    const formatters = new Map(), formatterLimit = 64;
+    function formatter(kind, options = {}) {
+      let key = null;
+      if(options && typeof options === 'object' && [Object.prototype,null].includes(Object.getPrototypeOf(options))) {
+        const descriptors = Object.getOwnPropertyDescriptors(options), names = Reflect.ownKeys(descriptors);
+        if(names.every(name => typeof name === 'string' && Object.hasOwn(descriptors[name],'value')
+          && (descriptors[name].value === null || ['string','number','boolean','undefined'].includes(typeof descriptors[name].value)))) {
+          key = JSON.stringify([kind,current,names.sort().map(name => {
+            const value = descriptors[name].value;
+            return [name,typeof value,Object.is(value,-0) ? '-0' : String(value)];
+          })]);
+        }
+      }
+      // Accessors, inherited options and coercible objects retain native Intl
+      // evaluation semantics instead of being evaluated twice for a cache key.
+      if(key !== null && formatters.has(key)) {
+        const value = formatters.get(key);formatters.delete(key);formatters.set(key,value);return value;
+      }
+      const value = new Intl[kind](current,options);
+      if(key !== null) {
+        formatters.set(key,value);
+        if(formatters.size > formatterLimit)formatters.delete(formatters.keys().next().value);
+      }
+      return value;
+    }
     const getLanguage = () => current;
     const setLanguage = value => {current=normalize(value);return current};
     const textFor = values => typeof values?.[current] === 'string' && values[current] ? values[current] : typeof values?.['zh-CN'] === 'string' && values['zh-CN'] ? values['zh-CN'] : null;
     function t(key, params = {}, fallback) {
       const row=Object.hasOwn(messages,key) ? messages[key] : null;
       const count=params && Object.hasOwn(params,'count') ? Number(String(params.count).replace(/,/g,'')) : NaN;
-      const plural=Number.isFinite(count) ? new Intl.PluralRules(current).select(count) : null;
+      const plural=Number.isFinite(count) ? formatter('PluralRules').select(count) : null;
       const variant=plural && row?.[current+'-'+plural];
       const value=typeof variant==='string' && variant ? variant : textFor(row);
       return interpolate(value || (typeof fallback==='string' && fallback ? fallback : generic[current]),params || {});
     }
     function number(value, options = {}) {
       if(typeof value!=='number'||!Number.isFinite(value))return generic[current];
-      try{return new Intl.NumberFormat(current,options).format(value)}catch{return new Intl.NumberFormat(current).format(value)}
+      try{return formatter('NumberFormat',options).format(value)}catch{return formatter('NumberFormat').format(value)}
     }
     function money(value,currency,options = {}) {
       if(typeof value!=='number'||!Number.isFinite(value)||typeof currency!=='string'||!/^[A-Z]{3}$/.test(currency))return generic[current];
@@ -45,13 +72,13 @@ const SumiI18n = (() => {
       if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return generic[current];
       const parsed=new Date(value+'T12:00:00Z');
       if(!Number.isFinite(parsed.getTime())||parsed.toISOString().slice(0,10)!==value)return generic[current];
-      try{return new Intl.DateTimeFormat(current,{...(options || {year:'numeric',month:'2-digit',day:'2-digit'}),timeZone:'UTC'}).format(parsed)}catch{return generic[current]}
+      try{return formatter('DateTimeFormat',{...(options || {year:'numeric',month:'2-digit',day:'2-digit'}),timeZone:'UTC'}).format(parsed)}catch{return generic[current]}
     }
     function dateTime(value,options = {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) {
       if(typeof value!=='string'||!value.trim())return generic[current];
       const parsed=new Date(value);
       if(!Number.isFinite(parsed.getTime()))return generic[current];
-      try{return new Intl.DateTimeFormat(current,options).format(parsed)}catch{return generic[current]}
+      try{return formatter('DateTimeFormat',options).format(parsed)}catch{return generic[current]}
     }
     function category(value) {
       if(typeof value!=='string')return '';

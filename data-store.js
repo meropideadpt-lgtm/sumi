@@ -3,7 +3,7 @@ const SumiData = (() => {
   const STORE = 'sumi-data-v1';
   const PREF = 'sumi-prefs-v1';
   const JOURNAL = 'sumi-write-journal-v1';
-  const defaults = {currency:'CNY', reminder:3, theme:'light', language:'zh-CN'};
+  const defaults = {currency:'CNY', reminder:3, theme:'light', language:'zh-CN', motion:'system'};
   // API coverage is checked by the FX layer; syntax validation must keep old,
   // unsupported currencies readable instead of deleting their original amounts.
   const currency = value => typeof value === 'string' && /^[A-Z]{3}$/.test(value);
@@ -75,6 +75,7 @@ const SumiData = (() => {
   const safeLogo = value => {
     if (!value) return '';
     if (typeof value !== 'string') return '';
+    if (/^sumi-logo:[a-f0-9]{64}$/.test(value)) return value;
     if (/^assets\/brands\/[a-z0-9]+(?:-[a-z0-9]+)*\.svg$/.test(value)) return value;
     if (/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value)) return value;
     try {
@@ -130,7 +131,7 @@ const SumiData = (() => {
   function preferences(value = {}) {
     if (!object(value)) fail('偏好设置无效');
     const p = {...defaults, ...value};
-    if (!currency(p.currency) || ![0,1,3,7,14].includes(p.reminder) || !['light','dark','system'].includes(p.theme) || !['zh-CN','zh-TW','ja-JP','en'].includes(p.language)) fail('偏好设置无效');
+    if (!currency(p.currency) || ![0,1,3,7,14].includes(p.reminder) || !['light','dark','system'].includes(p.theme) || !['zh-CN','zh-TW','ja-JP','en'].includes(p.language) || !['system','reduce'].includes(p.motion)) fail('偏好设置无效');
     return p;
   }
   function records(value, tolerant = false) {

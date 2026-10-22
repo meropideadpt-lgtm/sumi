@@ -3,6 +3,8 @@ const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMon
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const t=(key,params)=>SumiI18n.t('app.'+key,params),tx=(key,params)=>esc(t(key,params));
 const dateText=(value,options)=>SumiI18n.date(value,options),numberText=(value,options)=>SumiI18n.number(value,options);
+const t6=(key,params)=>SumiI18n.t('stage6.'+key,params),tx6=(key,params)=>esc(t6(key,params));
+let exporting=false,importing=false,logoStorageWarning=false;
 const errorText=error=>SumiI18n.error(error?.message||error);
 const storage=SumiData.open({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value),removeItem:key=>localStorage.removeItem(key)});
 let data=storage.data,preferences=storage.preferences,view='home',filter='',statusFilter='all',modal=null,detailId=null,picker=false,selectedLogo='',pickerSearch='',calOffset=0,formDraft=null,paymentModal=null,paymentDraft=null,confirming=false,uploadGeneration=0,logoUploading=false,logoError='',suggestionsOpen=false,suggestionIndex=-1,suggestionResults=[],nameComposing=false,pickerComposing=false,fxRenderPending=false,uiReady=false,statsFilters={mode:'year',year:today().slice(0,4),month:today().slice(0,7),start:today().slice(0,4)+'-01-01',end:today(),error:''};
@@ -19,8 +21,8 @@ const categoryValues=['未分类','影音娱乐','音乐音频','AI 工具','工
 function setCategoryInput(value){const input=$('#category');if(!input)return;input.value=SumiI18n.category(value);input.dataset.originalCategory=value;input.dataset.originalLabel=input.value}
 function readCategoryInput(){const input=$('#category'),value=input.value.trim();if(value===input.dataset.originalLabel)return input.dataset.originalCategory;return categoryValues.find(item=>SumiI18n.category(item)===value)||value||'未分类'}
 function render(){
-  SumiI18n.setLanguage(preferences.language);document.documentElement.lang=SumiI18n.getLanguage();SumiTheme.apply(preferences.theme);
-  $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand">sumi</div><nav class="nav" aria-label="${tx('nav.main')}">${nav.map(([key,icon])=>`<button class="${view===key?'active':''} ${key==='settings'?'settings-link':''}" data-nav="${key}" ${view===key?'aria-current="page"':''}><span class="symbol">${sumiIcon(icon)}</span>${tx('nav.'+key)}</button>`).join('')}</nav></aside><main class="main view-${view}">${storage.issues.length?`<div class="storage-notice" role="alert">${storage.issues.map(issue=>esc(errorText(issue))).join(' ')} <button class="linkbtn" id="exportRaw">${tx('exportRaw')}</button></div>`:''}<header class="top"><div><h1>${tx('nav.'+view)}</h1><p class="sub">${tx('subtitle.'+view)}</p></div>${view!=='settings'?`<button class="primary" data-add>${sumiIcon('plus')}${tx('addSubscription')}</button>`:''}</header>${({home:homePage,list:listPage,stats:statsPage,calendar:calendarPage,settings:settingsPage})[view]()}</main></div>${modal?modalHtml():''}${detailId?detailHtml():''}${picker?pickerHtml():''}${paymentModal?paymentHtml():''}`;bind();
+  SumiI18n.setLanguage(preferences.language);document.documentElement.lang=SumiI18n.getLanguage();SumiTheme.apply(preferences.theme);SumiMotion.apply(preferences.motion);
+  $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand">sumi</div><nav class="nav" aria-label="${tx('nav.main')}">${nav.map(([key,icon])=>`<button class="${view===key?'active':''} ${key==='settings'?'settings-link':''}" data-nav="${key}" ${view===key?'aria-current="page"':''}><span class="symbol">${sumiIcon(icon)}</span>${tx('nav.'+key)}</button>`).join('')}</nav></aside><main class="main view-${view}">${storage.issues.length?`<div class="storage-notice" role="alert">${storage.issues.map(issue=>esc(errorText(issue))).join(' ')} <button class="linkbtn" id="exportRaw">${tx('exportRaw')}</button></div>`:''}<header class="top"><div><h1>${tx('nav.'+view)}</h1><p class="sub">${tx('subtitle.'+view)}</p></div>${view!=='settings'?`<button class="primary" data-add>${sumiIcon('plus')}${tx('addSubscription')}</button>`:''}</header>${({home:homePage,list:listPage,stats:statsPage,calendar:calendarPage,settings:settingsPage})[view]()}</main></div>${modal?modalHtml():''}${detailId?detailHtml():''}${picker?pickerHtml():''}${paymentModal?paymentHtml():''}`;bind();SumiMotion.afterRender({view,modal,detailId,picker,paymentModal});showLogoStorageWarning();
 }
 const metrics=()=>{
   const subscriptions=data.subscriptions.filter(active),next=[...subscriptions].sort((a,b)=>a.nextDate.localeCompare(b.nextDate))[0];
@@ -30,9 +32,13 @@ function reminders(){
   const list=data.subscriptions.filter(s=>active(s)&&daysUntil(s.nextDate)<=Number(preferences.reminder)).sort((a,b)=>a.nextDate.localeCompare(b.nextDate));
   return list.length?`<div class="reminders"><div class="reminder-title">${sumiIcon('bell')}${tx('renewalReminder')} <span class="pill">${tx('attentionCount',{count:numberText(list.length)})}</span></div>${list.map(s=>`<div class="reminder-item"><div><strong class="reminder-name">${esc(s.name)}</strong><div class="notice">${daysUntil(s.nextDate)<0?tx('overdue'):daysUntil(s.nextDate)===0?tx('dueToday'):tx('dueIn',{count:numberText(daysUntil(s.nextDate))})} · ${esc(original(s.amount,s.currency))}</div></div><button class="secondary" data-detail="${esc(s.id)}">${tx('view')}</button></div>`).join('')}</div>`:'';
 }
+function filteredSubscriptions(){const query=filter.toLowerCase();return data.subscriptions.filter(s=>(statusFilter==='all'||(statusFilter==='active'?active(s):!active(s)))&&s.name.toLowerCase().includes(query))}
+function tableRows(list){return list.map(s=>`<tr data-detail="${esc(s.id)}"><td><div class="service">${logoMarkup(s.name,s.logo)}${esc(s.name)}</div></td><td>${esc(original(s.amount,s.currency))} / ${tx('shortMonths',{count:numberText(s.months)})}</td><td>${esc(moneyDisplay(monthly(s)))}</td><td>${esc(dateText(s.nextDate))}</td><td><span class="tag ${active(s)?'':'off'}">${tx(active(s)?'active':'cancelled')}</span></td></tr>`).join('')}
+function bindDetails(scope=document){scope.querySelectorAll('[data-detail]').forEach(el=>el.onclick=()=>{detailId=el.dataset.detail;render()})}
+function refreshTable(){const body=$('.table tbody');if(!body)return;const list=filteredSubscriptions();body.innerHTML=tableRows(list);$('#tableEmpty').hidden=Boolean(list.length);bindDetails(body);bindLogos()}
 function table(){
-  const list=data.subscriptions.filter(s=>(statusFilter==='all'||(statusFilter==='active'?active(s):!active(s)))&&s.name.toLowerCase().includes(filter.toLowerCase()));
-  return `<div class="card section ${view==='home'?'home-table':''}"><div class="section-title"><h2>${tx('mySubscriptions')}</h2><div class="tools"><input class="search" id="search" value="${esc(filter)}" aria-label="${tx('searchSubscriptions')}" placeholder="${tx('searchSubscriptions')}"/><select class="select" id="statusFilter" aria-label="${tx('status')}"><option value="all" ${statusFilter==='all'?'selected':''}>${tx('allSubscriptions')}</option><option value="active" ${statusFilter==='active'?'selected':''}>${tx('active')}</option><option value="cancelled" ${statusFilter==='cancelled'?'selected':''}>${tx('cancelled')}</option></select></div></div><div class="table-wrap"><table class="table"><thead><tr>${['service','cost','monthlyAverage','nextRenewal','status'].map(key=>`<th>${tx(key)}</th>`).join('')}</tr></thead><tbody>${list.map(s=>`<tr data-detail="${esc(s.id)}"><td><div class="service">${logoMarkup(s.name,s.logo)}${esc(s.name)}</div></td><td>${esc(original(s.amount,s.currency))} / ${tx('shortMonths',{count:numberText(s.months)})}</td><td>${esc(moneyDisplay(monthly(s)))}</td><td>${esc(dateText(s.nextDate))}</td><td><span class="tag ${active(s)?'':'off'}">${tx(active(s)?'active':'cancelled')}</span></td></tr>`).join('')}</tbody></table>${!list.length?`<div class="empty">${tx('emptySubscriptions')}</div>`:''}</div></div>`;
+  const list=filteredSubscriptions();
+  return `<div class="card section ${view==='home'?'home-table':''}"><div class="section-title"><h2>${tx('mySubscriptions')}</h2><div class="tools"><input class="search" id="search" value="${esc(filter)}" aria-label="${tx('searchSubscriptions')}" placeholder="${tx('searchSubscriptions')}"/><select class="select" id="statusFilter" aria-label="${tx('status')}"><option value="all" ${statusFilter==='all'?'selected':''}>${tx('allSubscriptions')}</option><option value="active" ${statusFilter==='active'?'selected':''}>${tx('active')}</option><option value="cancelled" ${statusFilter==='cancelled'?'selected':''}>${tx('cancelled')}</option></select></div></div><div class="table-wrap"><table class="table"><thead><tr>${['service','cost','monthlyAverage','nextRenewal','status'].map(key=>`<th>${tx(key)}</th>`).join('')}</tr></thead><tbody>${tableRows(list)}</tbody></table><div class="empty" id="tableEmpty" ${list.length?'hidden':''}>${tx('emptySubscriptions')}</div></div></div>`;
 }
 const homePage=()=>metrics()+mobileSummary()+`<div class="section home-reminders">${reminders()}</div>`+chart()+table()+mobileSubscriptions();
 const listPage=()=>table();
@@ -46,7 +52,7 @@ function calendarPage(){
   }
   return `<div class="card"><div class="section-title"><h2>${esc(dateText(month,{year:'numeric',month:'long'}))}</h2><div class="month-switch"><button class="secondary" data-month="-1" aria-label="${tx('previousMonth')}">${sumiIcon('chevron-left')}</button><button class="secondary" data-month="1" aria-label="${tx('nextMonth')}">${sumiIcon('chevron-right')}</button></div></div><div class="calendar-grid">${[5,6,7,8,9,10,11].map(day=>`<div class="small calendar-weekday">${esc(dateText(`2026-01-${String(day).padStart(2,'0')}`,{weekday:'short'}))}</div>`).join('')}${cells.join('')}</div><p class="note">${tx('calendarNote')}</p></div>`;
 }
-function settingsPage(){return `<div class="card"><div class="settings-row"><label for="language">${tx('language')}</label><select class="select" id="language">${[['zh-CN','简体中文'],['zh-TW','繁體中文'],['ja-JP','日本語'],['en','English']].map(([value,label])=>`<option value="${value}" ${preferences.language===value?'selected':''}>${label}</option>`).join('')}</select></div><div class="settings-row"><label for="currency">${tx('displayCurrency')}</label><select class="select" id="currency">${currencyOptions(preferences.currency)}</select></div>${fxPanel()}<div class="settings-row"><label for="theme">${tx('appearance')}</label><select class="select" id="theme">${['light','dark','system'].map(value=>`<option value="${value}" ${preferences.theme===value?'selected':''}>${tx(value)}</option>`).join('')}</select></div><div class="settings-row"><label for="reminder">${tx('siteReminder')}</label><select class="select" id="reminder">${[0,1,3,7,14].map(value=>`<option value="${value}" ${Number(preferences.reminder)===value?'selected':''}>${value?tx('daysBefore',{count:numberText(value)}):tx('onDay')}</option>`).join('')}</select></div><div class="settings-row"><label>${tx('backupRestore')}</label><div class="tools"><button class="secondary" id="export">${tx(storage.issues.length?'exportRaw':'exportJSON')}</button><button class="secondary" id="import">${tx('importJSON')}</button><input id="importFile" type="file" accept=".json,application/json" hidden></div></div><p class="note">${tx('backupNote')}</p></div>`}
+function settingsPage(){return `<div class="card"><div class="settings-row"><label for="language">${tx('language')}</label><select class="select" id="language">${[['zh-CN','简体中文'],['zh-TW','繁體中文'],['ja-JP','日本語'],['en','English']].map(([value,label])=>`<option value="${value}" ${preferences.language===value?'selected':''}>${label}</option>`).join('')}</select></div><div class="settings-row"><label for="currency">${tx('displayCurrency')}</label><select class="select" id="currency">${currencyOptions(preferences.currency)}</select></div>${fxPanel()}<div class="settings-row"><label for="theme">${tx('appearance')}</label><select class="select" id="theme">${['light','dark','system'].map(value=>`<option value="${value}" ${preferences.theme===value?'selected':''}>${tx(value)}</option>`).join('')}</select></div><div class="settings-row"><label for="motion">${tx6('motion')}</label><select class="select" id="motion">${['system','reduce'].map(value=>`<option value="${value}" ${(preferences.motion||'system')===value?'selected':''}>${tx6('motion.'+value)}</option>`).join('')}</select></div><div class="settings-row"><label for="reminder">${tx('siteReminder')}</label><select class="select" id="reminder">${[0,1,3,7,14].map(value=>`<option value="${value}" ${Number(preferences.reminder)===value?'selected':''}>${value?tx('daysBefore',{count:numberText(value)}):tx('onDay')}</option>`).join('')}</select></div><div class="settings-row"><label>${tx('backupRestore')}</label><div class="tools"><button class="secondary" id="export">${tx(storage.issues.length?'exportRaw':'exportJSON')}</button><button class="secondary" id="import">${tx('importJSON')}</button><input id="importFile" type="file" accept=".json,application/json" hidden></div></div><p class="note">${tx('backupNote')}</p>${SumiPWA.settingsMarkup()}</div>`}
 function modalHtml(){
   const s=formDraft||(modal==='new'?{name:'',amount:'',currency:'CNY',months:1,nextDate:today(),status:'active',autoRenew:true,logo:''}:data.subscriptions.find(x=>x.id===modal));if(!s)return '';
   const category=s.category||'未分类',categoryLabel=SumiI18n.category(category);
@@ -111,7 +117,7 @@ function resolvedLogo(url){
 }
 function logoMarkup(name,url){
   const source=resolvedLogo(url);
-  return SumiData.safeLogo(source)?`<img class="logo" src="${esc(source)}" alt="${tx('namedLogo',{name:name||t('subscription')})}" decoding="async" referrerpolicy="no-referrer" data-logo-image data-logo-name="${esc(name||'')}">`:neutralLogo(name);
+  return SumiData.safeLogo(source)?`<img class="logo" ${SumiLogoStore.isReference(source)?`data-logo-ref="${esc(source)}"`:`src="${esc(source)}"`} loading="${picker||modal||detailId||view==='stats'?'eager':'lazy'}" width="40" height="40" alt="${tx('namedLogo',{name:name||t('subscription')})}" decoding="async" referrerpolicy="no-referrer" data-logo-image data-logo-name="${esc(name||'')}">`:neutralLogo(name);
 }
 function statisticsLogo(name,subscriptionId){
   const subscription=data.subscriptions.find(item=>item.id===subscriptionId);
@@ -173,16 +179,16 @@ function pickerResultsHtml(){
   const list=SumiCatalog.search(pickerSearch,{limit:80});
   return list.length?list.map(service=>`<button type="button" class="pick-item" data-pick="${esc(service.id)}" aria-label="${tx('chooseNamedLogo',{name:service.name})}">${logoMarkup(service.name,service.logo)}<span>${esc(service.name)}</span><span class="small">${esc(SumiI18n.category(service.category))}</span></button>`).join(''):`<p class="picker-empty small">${tx('noLogoMatch')}</p>`;
 }
-function pickerHtml(){return `<div class="overlay" id="pickerOverlay"><div class="modal logo-modal" role="dialog" aria-modal="true" aria-labelledby="pickerTitle"><div class="modal-head"><h2 id="pickerTitle">${tx('chooseLogo')}</h2><button type="button" class="iconbtn" id="closePicker" aria-label="${tx('closeLogo')}">${sumiIcon('close')}</button></div><div class="picker-current">${logoMarkup(formDraft?.name,selectedLogo)}<div><strong>${tx('currentLogo')}</strong><p class="small">${tx(selectedLogo?'canReplaceLogo':'noSelectedLogo')}</p></div></div><label class="small" for="pickerSearch">${tx('searchLogos')}</label><input class="search" id="pickerSearch" placeholder="${tx('searchAliases')}" value="${esc(pickerSearch)}" autocomplete="off"><div class="picker-grid" id="pickerResults">${pickerResultsHtml()}</div><div class="logo-actions"><button type="button" class="secondary" id="chooseUpload">${sumiIcon('upload')}${tx(selectedLogo?'replaceUpload':'uploadImage')}</button><button type="button" class="secondary" id="removeLogo" ${selectedLogo?'':'disabled'}>${sumiIcon('trash')}${tx('removeLogo')}</button><input id="uploadLogo" type="file" accept="image/png,image/jpeg,image/webp" hidden></div><p id="logoUploadStatus" class="logo-upload-status small" role="status">${logoUploading?tx('checkingImage'):''}</p><p id="logoError" class="logo-error" role="alert" ${logoError?'':'hidden'}>${logoError?esc(errorText(logoError)):''}</p><p class="note">${tx('uploadNote')}</p></div></div>`}
+function pickerHtml(){return `<div class="overlay" id="pickerOverlay"><div class="modal logo-modal" role="dialog" aria-modal="true" aria-labelledby="pickerTitle"><div class="modal-head"><h2 id="pickerTitle">${tx('chooseLogo')}</h2><button type="button" class="iconbtn" id="closePicker" aria-label="${tx('closeLogo')}">${sumiIcon('close')}</button></div><div class="picker-current">${logoMarkup(formDraft?.name,selectedLogo)}<div><strong>${tx('currentLogo')}</strong><p class="small">${tx(selectedLogo?'canReplaceLogo':'noSelectedLogo')}</p></div></div><label class="small" for="pickerSearch">${tx('searchLogos')}</label><input class="search" id="pickerSearch" placeholder="${tx('searchAliases')}" value="${esc(pickerSearch)}" autocomplete="off"><div class="picker-grid" id="pickerResults">${pickerResultsHtml()}</div><div class="logo-actions"><button type="button" class="secondary" id="chooseUpload">${sumiIcon('upload')}${tx(selectedLogo?'replaceUpload':'uploadImage')}</button><button type="button" class="secondary" id="removeLogo" ${selectedLogo?'':'disabled'}>${sumiIcon('trash')}${tx('removeLogo')}</button><input id="uploadLogo" type="file" accept="image/png,image/jpeg,image/webp" hidden></div><p id="logoUploadStatus" class="logo-upload-status small" role="status">${logoUploading?tx('checkingImage'):''}</p><p id="logoError" class="logo-error" role="alert" ${logoError?'':'hidden'}>${logoError?esc(errorText(logoError)):''}</p><p class="note">${tx6('uploadNote')}</p></div></div>`}
 
 function resetPickerState(){uploadGeneration++;logoUploading=false;logoError='';pickerComposing=false}
-function closePicker(){resetPickerState();picker=false;render();$('#openPicker')?.focus()}
+function closePicker(){const target=modal;resetPickerState();SumiMotion.close('#pickerOverlay',()=>{if(modal!==target||!picker)return;resetPickerState();picker=false;render();$('#openPicker')?.focus({preventScroll:true})})}
 function bindPickerChoices(){
   document.querySelectorAll('[data-pick]').forEach(button=>button.onclick=()=>{
     const service=SumiCatalog.get(button.dataset.pick);if(!service)return;
     resetPickerState();selectedLogo=service.logo||'';formDraft.logo=selectedLogo;
     if(!formDraft.name.trim()){formDraft.name=service.name;if(!formDraft.category||formDraft.category==='未分类')formDraft.category=service.category}
-    picker=false;render();$('#openPicker')?.focus();
+    picker=false;render();$('#openPicker')?.focus({preventScroll:true});
   });
 }
 function pickerFeedback(){
@@ -297,8 +303,14 @@ function bindLogos(){
     if(img.dataset.logoBound)return;img.dataset.logoBound='true';
     const fallback=()=>{const el=document.createElement('span');el.className='logo fallback';el.setAttribute('role','img');el.setAttribute('aria-label',t(img.dataset.logoName?'namedNoLogo':'noLogo',{name:img.dataset.logoName}));el.innerHTML=sumiIcon('image');img.replaceWith(el)};
     img.addEventListener('error',fallback,{once:true});
-    if(img.complete&&!img.naturalWidth)fallback();
+    if(img.dataset.logoRef){
+      SumiLogoStore.resolve(img.dataset.logoRef).then(source=>{if(!img.isConnected)return;if(source)img.src=source;else{logoStorageWarning=true;fallback();showLogoStorageWarning()}}).catch(()=>{if(img.isConnected){logoStorageWarning=true;fallback();showLogoStorageWarning()}});
+    }else if(img.complete&&!img.naturalWidth)fallback();
   });
+}
+function showLogoStorageWarning(){
+  if(!logoStorageWarning||$('#logoStorageNotice'))return;
+  const note=document.createElement('p');note.id='logoStorageNotice';note.className='storage-notice';note.setAttribute('role','status');note.textContent=t6('missingLogo');$('.main')?.prepend(note);
 }
 function commit(nextData,nextPrefs=preferences,recovery=false){
   try{storage.write(nextData,nextPrefs,recovery);data=nextData;preferences=nextPrefs;return true}
@@ -323,7 +335,7 @@ function bindValidation(){
   });
 }
 function bind(){
-  bindLogos();bindValidation();
+  bindLogos();bindValidation();SumiPWA.bind();
   $('#refreshRates')?.addEventListener('click',()=>fxManager.refresh({force:true}));
   $('#startCostHistory')?.addEventListener('click',()=>{if(updateData(()=>{}))render()});
   $('#statsMode')?.addEventListener('change',()=>{captureStatsFilters();statsFilters.error='';render()});
@@ -331,14 +343,14 @@ function bind(){
   $('[data-show-subscriptions]')?.addEventListener('click',()=>{view='list';filter='';render()});
   $('#exportRaw')?.addEventListener('click',()=>downloadJson(storage.rawBackup(),`sumi-recovery-${today()}.json`));
   document.querySelectorAll('[data-nav]').forEach(el=>el.onclick=()=>{view=el.dataset.nav;filter='';render()});
-  document.querySelectorAll('[data-add]').forEach(el=>el.onclick=()=>{resetPickerState();closeSuggestions();modal='new';formDraft=null;selectedLogo='';render();$('#name')?.focus()});
-  document.querySelectorAll('[data-detail]').forEach(el=>el.onclick=()=>{detailId=el.dataset.detail;render()});
-  $('#search')?.addEventListener('input',e=>{filter=e.target.value;const pos=e.target.selectionStart;render();$('#search')?.focus();$('#search')?.setSelectionRange(pos,pos)});
-  $('#statusFilter')?.addEventListener('change',e=>{statusFilter=e.target.value;render()});
-  const closeModal=()=>{resetPickerState();closeSuggestions();nameComposing=false;modal=null;picker=false;formDraft=null;selectedLogo='';render()};
+  document.querySelectorAll('[data-add]').forEach(el=>el.onclick=()=>{resetPickerState();closeSuggestions();modal='new';formDraft=null;selectedLogo='';render();$('#name')?.focus({preventScroll:true})});
+  bindDetails();
+  $('#search')?.addEventListener('input',e=>{filter=e.target.value;refreshTable()});
+  $('#statusFilter')?.addEventListener('change',e=>{statusFilter=e.target.value;refreshTable()});
+  const closeModal=()=>{const target=modal;resetPickerState();SumiMotion.close('#modalOverlay',()=>{if(modal!==target)return;resetPickerState();closeSuggestions();nameComposing=false;modal=null;picker=false;formDraft=null;selectedLogo='';render()})};
   document.querySelectorAll('[data-close]').forEach(el=>el.onclick=closeModal);
   $('#modalOverlay')?.addEventListener('click',e=>{if(e.target.id==='modalOverlay')closeModal()});
-  $('#openPicker')?.addEventListener('click',()=>{captureDraft();closeSuggestions();resetPickerState();picker=true;pickerSearch='';render();$('#pickerSearch')?.focus()});
+  $('#openPicker')?.addEventListener('click',()=>{captureDraft();closeSuggestions();resetPickerState();picker=true;pickerSearch='';render();$('#pickerSearch')?.focus({preventScroll:true})});
   $('#subscriptionForm')?.addEventListener('input',captureDraft);
   $('#subscriptionForm')?.addEventListener('change',captureDraft);
   $('#subscriptionForm')?.addEventListener('submit',e=>{
@@ -368,20 +380,24 @@ function bind(){
   $('#pickerSearch')?.addEventListener('keydown',event=>{if(event.key==='ArrowDown'&&!event.isComposing&&!pickerComposing){event.preventDefault();$('[data-pick]')?.focus()}});
   bindPickerChoices();
   $('#chooseUpload')?.addEventListener('click',()=>$('#uploadLogo')?.click());
-  $('#removeLogo')?.addEventListener('click',()=>{resetPickerState();selectedLogo='';formDraft.logo='';picker=false;render();$('#openPicker')?.focus()});
+  $('#removeLogo')?.addEventListener('click',()=>{resetPickerState();selectedLogo='';formDraft.logo='';picker=false;render();$('#openPicker')?.focus({preventScroll:true})});
   $('#uploadLogo')?.addEventListener('change',async event=>{
     const file=event.target.files?.[0];if(!file)return;
     const generation=++uploadGeneration,targetModal=modal;
     const pending=()=>generation===uploadGeneration&&modal===targetModal&&picker&&formDraft;
     logoUploading=true;logoError='';pickerFeedback();
     try{
-      const result=await SumiLogoUpload.read(file);
+      const compressed=await SumiLogoUpload.read(file);
       if(!pending())return;
-      logoUploading=false;selectedLogo=result;formDraft.logo=result;picker=false;render();$('#openPicker')?.focus();
+      const result=await SumiLogoStore.save(compressed);
+      if(!pending())return;
+      logoUploading=false;selectedLogo=result;formDraft.logo=result;picker=false;render();$('#openPicker')?.focus({preventScroll:true});
     }catch(error){if(pending()){logoUploading=false;logoError=error.message||t('imageReadFailure');if($('#uploadLogo'))$('#uploadLogo').value='';pickerFeedback()}}
   });
-  $('#drawerOverlay')?.addEventListener('click',e=>{if(e.target.id==='drawerOverlay'){detailId=null;render()}});
-  document.querySelectorAll('[data-close-detail]').forEach(b=>b.onclick=()=>{detailId=null;render()});
+  const closeDetail=()=>{const target=detailId;SumiMotion.close('#drawerOverlay',()=>{if(detailId===target){detailId=null;render()}})};
+  $('#drawerOverlay')?.addEventListener('click',e=>{if(e.target.id==='drawerOverlay')closeDetail()});
+  document.querySelectorAll('[data-close-detail]').forEach(b=>b.onclick=closeDetail);
+  bindDialogKeys($('#drawerOverlay .drawer'),closeDetail);
   $('[data-edit]')?.addEventListener('click',()=>{resetPickerState();closeSuggestions();modal=detailId;detailId=null;formDraft=null;selectedLogo=data.subscriptions.find(s=>s.id===modal)?.logo||'';render()});
   $('[data-toggle]')?.addEventListener('click',()=>{const current=data.subscriptions.find(s=>s.id===detailId);if(!confirm(t(active(current)?'confirmCancel':'confirmRestore')))return;if(updateData(next=>{const s=next.subscriptions.find(x=>x.id===detailId);s.status=active(s)?'cancelled':'active'}))render()});
   $('[data-delete]')?.addEventListener('click',()=>{
@@ -407,7 +423,8 @@ function bind(){
   });
   $('[data-payment]')?.addEventListener('click',()=>{paymentModal='new';paymentDraft=null;render()});
   document.querySelectorAll('[data-edit-payment]').forEach(button=>button.onclick=()=>{paymentModal=button.dataset.editPayment;paymentDraft=null;render()});
-  const closePayment=()=>{paymentModal=null;paymentDraft=null;render()};
+  const closePayment=()=>{const target=paymentModal;SumiMotion.close('#paymentOverlay',()=>{if(paymentModal===target){paymentModal=null;paymentDraft=null;render()}})};
+  bindDialogKeys($('#paymentOverlay .modal'),closePayment);
   document.querySelectorAll('[data-close-payment]').forEach(button=>button.onclick=closePayment);
   $('#paymentOverlay')?.addEventListener('click',e=>{if(e.target.id==='paymentOverlay')closePayment()});
   const capturePayment=capturePaymentDraft;
@@ -433,25 +450,34 @@ function bind(){
     if(confirm(text)&&updateData(next=>changePayment(next,null,previous)))render();
   });
   document.querySelectorAll('[data-month]').forEach(b=>b.onclick=()=>{calOffset+=Number(b.dataset.month);render()});
-  for(const key of ['currency','theme','reminder','language'])$('#'+key)?.addEventListener('change',e=>{
+  for(const key of ['currency','theme','reminder','language','motion'])$('#'+key)?.addEventListener('change',e=>{
     commitPreferences({...preferences,[key]:key==='reminder'?Number(e.target.value):e.target.value});render();$('#'+key)?.focus();
   });
-  $('#export')?.addEventListener('click',()=>{
-    if(storage.issues.length)downloadJson(storage.rawBackup(),`sumi-recovery-${today()}.json`);
-    else downloadJson({version:1,data,preferences},`sumi-backup-${today()}.json`);
+  $('#export')?.addEventListener('click',async event=>{
+    if(exporting)return;exporting=true;event.currentTarget.disabled=true;
+    try{
+      if(storage.issues.length)downloadJson(storage.rawBackup(),`sumi-recovery-${today()}.json`);
+      else{const savedPreferences=structuredClone(preferences),savedData=structuredClone(data);downloadJson({version:1,data:await SumiLogoStore.hydrateBackup(savedData),preferences:savedPreferences},`sumi-backup-${today()}.json`)}
+    }catch(error){alert(errorText(error))}finally{exporting=false;if($('#export'))$('#export').disabled=false}
   });
   $('#import')?.addEventListener('click',()=>$('#importFile').click());
   $('#importFile')?.addEventListener('change',async e=>{
-    const file=e.target.files?.[0];if(!file)return;
+    const file=e.target.files?.[0];if(!file||importing)return;importing=true;
     try{
-      if(file.size>10*1024*1024)throw Error(t('largeBackup'));
+      if(file.size>50*1024*1024)throw Error(t('largeBackup'));
       const obj=SumiData.backup(JSON.parse(await file.text()));
+      obj.data=await SumiLogoStore.hydrateBackup(obj.data);
+      if(modal||paymentModal||picker||logoUploading)throw Error(t6('importBusy'));
       if(!confirm(t('confirmImport')))return;
-      if(commit(obj.data,obj.preferences,true)){modal=null;detailId=null;formDraft=null;paymentModal=null;paymentDraft=null;render()}
+      const previousData=data,previousPreferences=preferences;
+      obj.data=await SumiLogoStore.prepareImport(obj.data);
+      if(data!==previousData||preferences!==previousPreferences||modal||paymentModal||picker||logoUploading)throw Error(t6('importBusy'));
+      if(commit(obj.data,obj.preferences,true)){resetPickerState();closeSuggestions();picker=false;selectedLogo='';nameComposing=false;modal=null;detailId=null;formDraft=null;paymentModal=null;paymentDraft=null;logoStorageWarning=false;render()}
     }catch(error){alert(t('importFailed',{error:errorText(error)}))}
-    finally{e.target.value=''}
+    finally{importing=false;e.target.value=''}
   });
 }
 render();uiReady=true;fxManager.refresh();
+SumiPWA.start({isBusy:()=>Boolean(modal||paymentModal||picker||logoUploading||exporting||importing||confirming),onChange:()=>{const panel=$('#pwaPanel');if(panel){const focusId=document.activeElement?.id;panel.outerHTML=SumiPWA.settingsMarkup();SumiPWA.bind();if(focusId)document.getElementById(focusId)?.focus({preventScroll:true})}}});
 setInterval(()=>fxManager.refresh(),60*60*1000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)fxManager.refresh()});

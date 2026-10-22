@@ -1010,10 +1010,10 @@ Object.assign(globalThis.SumiMessages, {
     "en": "Delete this payment?"
   },
   "app.largeBackup": {
-    "zh-CN": "备份文件超过 10MB，请检查文件。",
-    "zh-TW": "備份檔案超過 10MB，請檢查檔案。",
-    "ja-JP": "バックアップファイルが 10 MB を超えています。確認してください。",
-    "en": "The backup exceeds 10 MB. Check the file."
+    "zh-CN": "备份文件超过 50MB，请检查文件。",
+    "zh-TW": "備份檔案超過 50MB，請檢查檔案。",
+    "ja-JP": "バックアップファイルが 50 MB を超えています。確認してください。",
+    "en": "The backup exceeds 50 MB. Check the file."
   },
   "app.confirmImport": {
     "zh-CN": "导入会替换当前所有订阅、付款记录和偏好设置，是否继续？",

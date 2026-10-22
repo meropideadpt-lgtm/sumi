@@ -344,7 +344,9 @@ class StageFourTests(unittest.TestCase):
                 self.upload(self.picture(format=format))
                 self.submit()
                 record=self.store()['subscriptions'][-1]
-                self.assertTrue(record['logo'].startswith('data:'+self.picture(format=format)['mimeType']+';base64,'))
+                self.assertRegex(record['logo'],r'^sumi-logo:[a-f0-9]{64}$')
+                image=self.page.evaluate('(ref)=>SumiLogoStore.resolve(ref)',record['logo'])
+                self.assertTrue(image.startswith(('data:image/webp;base64,','data:image/png;base64,')))
         self.page.reload()
         expect(self.page.locator('tr[data-detail] img.logo')).to_have_count(3)
 
@@ -356,7 +358,7 @@ class StageFourTests(unittest.TestCase):
         second=self.page.locator('#openPicker img').get_attribute('src')
         self.assertNotEqual(first,second)
         self.submit()
-        self.assertEqual(self.store()['subscriptions'][0]['logo'],second)
+        self.assertEqual(self.page.evaluate('(ref)=>SumiLogoStore.resolve(ref)',self.store()['subscriptions'][0]['logo']),second)
         self.page.reload()
         self.edit_first()
         self.assert_loaded(self.page.locator('#openPicker img'),second)
@@ -391,8 +393,8 @@ class StageFourTests(unittest.TestCase):
             {'name':'bad.svg','mimeType':'image/svg+xml','buffer':b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'},
             {'name':'fake.png','mimeType':'image/png','buffer':b'<svg onload="window.injected=1"></svg>'},
             {'name':'wrong.jpeg','mimeType':'image/jpeg','buffer':self.picture()['buffer']},
-            {'name':'big.png','mimeType':'image/png','buffer':b'x'*500001},
-            self.picture(size=(4097,1)),
+            {'name':'big.png','mimeType':'image/png','buffer':b'x'*(12*1024*1024+1)},
+            self.picture(size=(8193,1)),
         ]
         self.page.locator('#openPicker').click()
         for picture in invalid:

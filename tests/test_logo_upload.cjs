@@ -12,13 +12,14 @@ const bytes = base64 => new Uint8Array(Buffer.from(base64, 'base64'));
 const file = (body = PNG, type = 'image/png') => ({name:'logo', type, size:bytes(body).length});
 const adapters = (body = PNG, type = 'image/png') => ({
   readDataURL:async () => `data:${type};base64,${body}`,
-  decodeImage:async () => ({width:type === 'image/png' ? 1 : 2, height:type === 'image/png' ? 1 : 3})
+  decodeImage:async () => ({width:type === 'image/png' ? 1 : 2, height:type === 'image/png' ? 1 : 3}),
+  compressImage:async () => `data:image/png;base64,${PNG}`
 });
 function be32(array, offset, value) { array[offset] = value >>> 24; array[offset+1] = value >>> 16; array[offset+2] = value >>> 8; array[offset+3] = value; }
 
 test('upload metadata accepts only bounded nonempty raster files', () => {
   for (const type of Upload.MIME_TYPES) assert.deepEqual(Upload.validateFile({type,size:500000}), {mime:type,size:500000});
-  for (const candidate of [null,{}, {type:'image/svg+xml',size:1}, {type:'image/gif',size:1}, {type:'image/png',size:0}, {type:'image/png',size:500001}, {type:'image/png',size:NaN}, {type:'image/png',size:1.5}]) {
+  for (const candidate of [null,{}, {type:'image/svg+xml',size:1}, {type:'image/gif',size:1}, {type:'image/png',size:0}, {type:'image/png',size:Upload.MAX_BYTES+1}, {type:'image/png',size:NaN}, {type:'image/png',size:1.5}]) {
     assert.throws(() => Upload.validateFile(candidate));
   }
 });
@@ -52,7 +53,7 @@ test('truncated or trailing-content PNG JPEG and WebP files are rejected', () =>
 });
 
 test('oversized PNG dimensions and total pixels are rejected before decode', () => {
-  for (const [width,height] of [[4097,1],[1,4097],[4096,4096],[0,1]]) {
+  for (const [width,height] of [[8193,1],[1,8193],[8192,8192],[0,1]]) {
     const value=bytes(PNG); be32(value,16,width);be32(value,20,height);
     assert.throws(() => Upload.inspectBytes(value,'image/png'));
   }
@@ -62,13 +63,13 @@ test('oversized PNG dimensions and total pixels are rejected before decode', () 
 
 test('oversized JPEG and WebP dimensions are detected in headers', () => {
   const jpg=bytes(JPEG), marker=Buffer.from(jpg).indexOf(Buffer.from([255,192]));
-  jpg[marker+7]=0x10;jpg[marker+8]=0x01;
+  jpg[marker+7]=0x20;jpg[marker+8]=0x01;
   assert.throws(() => Upload.inspectBytes(jpg,'image/jpeg'), /尺寸/);
-  const lossy=bytes(WEBP);lossy[26]=1;lossy[27]=16;
+  const lossy=bytes(WEBP);lossy[26]=1;lossy[27]=32;
   assert.throws(() => Upload.inspectBytes(lossy,'image/webp'), /尺寸/);
-  const lossless=bytes(WEBP_LOSSLESS);lossless[21]=0;lossless[22]=(lossless[22]&0xc0)|16;
+  const lossless=bytes(WEBP_LOSSLESS);lossless[21]=0;lossless[22]=(lossless[22]&0xc0)|32;
   assert.throws(() => Upload.inspectBytes(lossless,'image/webp'), /尺寸/);
-  const extended=bytes(WEBP_EXTENDED);extended[24]=0;extended[25]=16;extended[26]=0;
+  const extended=bytes(WEBP_EXTENDED);extended[24]=0;extended[25]=32;extended[26]=0;
   assert.throws(() => Upload.inspectBytes(extended,'image/webp'), /尺寸/);
 });
 
@@ -83,12 +84,12 @@ test('animation and inconsistent extended WebP dimensions are rejected', () => {
   assert.throws(() => Upload.inspectBytes(apng,'image/png'), /静态/);
 });
 
-test('read returns the original validated data URL only after real-image adapter acceptance', async () => {
+test('read normalizes each validated raster only after image decoding and compression', async () => {
   for (const [body,type] of [[PNG,'image/png'],[JPEG,'image/jpeg'],[WEBP,'image/webp']]) {
     let decoded=false;
     const io=adapters(body,type), decode=io.decodeImage;
     io.decodeImage=async url => { decoded=true;assert.equal(url,await io.readDataURL());return decode(url); };
-    assert.equal(await Upload.read(file(body,type),io),`data:${type};base64,${body}`);
+    assert.equal(await Upload.read(file(body,type),io),`data:image/png;base64,${PNG}`);
     assert.equal(decoded,true);
   }
 });
@@ -114,4 +115,31 @@ test('read and image-decode failures remain explicit and never return partial co
   await assert.rejects(Upload.read(file(),{...adapters(),decodeImage:async()=>{throw Error('invalid image')}}),/无法读取/);
   await assert.rejects(Upload.read(file(),{...adapters(),decodeImage:async()=>({width:0,height:0})}));
   await assert.rejects(Upload.read(file(),{...adapters(),decodeImage:async()=>({width:9000,height:9000})}),/尺寸/);
+});
+
+
+test('larger photos pass metadata checks while memory safety limits remain explicit', () => {
+  assert.equal(Upload.validateFile({type:'image/jpeg',size:8*1024*1024}).size,8*1024*1024);
+  assert.equal(Upload.validateFile({type:'image/png',size:Upload.MAX_BYTES}).size,Upload.MAX_BYTES);
+  assert.deepEqual(Upload.outputSize(8000,5000),{width:512,height:320});
+  assert.deepEqual(Upload.outputSize(120,60),{width:120,height:60});
+  assert.deepEqual(Upload.outputSize(1,8192),{width:1,height:512});
+});
+
+test('compression failure and oversized or non-raster output never return an image', async () => {
+  await assert.rejects(Upload.read(file(),{...adapters(),compressImage:async()=>{throw Error('canvas')}}),/压缩失败/);
+  await assert.rejects(Upload.read(file(),{...adapters(),compressImage:async()=> 'data:image/svg+xml;base64,PHN2Zz4='}));
+  const oversized=bytes(PNG);be32(oversized,16,513);
+  await assert.rejects(Upload.read(file(),{...adapters(),compressImage:async()=>`data:image/png;base64,${Buffer.from(oversized).toString('base64')}`}),/压缩失败/);
+});
+
+
+test('Blob input uses a temporary object URL and releases it after compression or failure', async () => {
+  const blob = new Blob([bytes(PNG)],{type:'image/png'});
+  let objectURL;
+  const io = {decodeImage:async url => { objectURL=url;assert.match(url,/^blob:/);return {width:1,height:1}; },compressImage:async()=>`data:image/png;base64,${PNG}`};
+  assert.equal(await Upload.read(blob,io),`data:image/png;base64,${PNG}`);
+  await assert.rejects(fetch(objectURL));
+  await assert.rejects(Upload.read(blob,{...io,compressImage:async()=>{throw Error('encode')}}),/压缩失败/);
+  await assert.rejects(fetch(objectURL));
 });

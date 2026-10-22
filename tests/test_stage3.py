@@ -494,7 +494,8 @@ class StageThreeTests(unittest.TestCase):
         self.assertEqual(saved['name'],'异步上传草稿')
         self.assertEqual(saved['amount'],36.5)
         self.assertEqual(saved['category'],'工作效率')
-        self.assertTrue(saved['logo'].startswith('data:image/png;base64,'))
+        self.assertRegex(saved['logo'],r'^sumi-logo:[a-f0-9]{64}$')
+        self.assertTrue(self.page.evaluate('(reference)=>SumiLogoStore.resolve(reference)',saved['logo']).startswith(('data:image/webp;base64,','data:image/png;base64,')))
 
     def test_statistics_remains_responsive_and_mobile_home_chart_stays_hidden(self):
         self.seed(self.history_fixture())

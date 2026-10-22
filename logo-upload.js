@@ -1,8 +1,10 @@
 /* Raster-only custom logo uploads. Brand SVG assets are handled by the catalogue. */
 const SumiLogoUpload = (() => {
-  const MAX_BYTES = 500000;
-  const MAX_EDGE = 4096;
-  const MAX_PIXELS = 16000000;
+  const MAX_BYTES = 12 * 1024 * 1024;
+  const OUTPUT_EDGE = 512;
+  const OUTPUT_BYTES = 300000;
+  const MAX_EDGE = 8192;
+  const MAX_PIXELS = 40000000;
   const MIME_TYPES = Object.freeze(['image/png', 'image/jpeg', 'image/webp']);
   const fail = message => { throw new Error(message); };
   const invalid = () => fail('图片内容无效或文件不完整，请选择有效的 PNG、JPEG 或 WebP 图片。');
@@ -15,7 +17,7 @@ const SumiLogoUpload = (() => {
   function dimensions(width, height) {
     if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1) invalid();
     if (width > MAX_EDGE || height > MAX_EDGE || width * height > MAX_PIXELS) {
-      fail('图片尺寸过大：每边最多 4096 像素，总像素不超过 1600 万。');
+      fail('图片尺寸过大：每边最多 8192 像素，总像素不超过 4000 万。');
     }
     return {width, height};
   }
@@ -23,7 +25,7 @@ const SumiLogoUpload = (() => {
   function validateFile(file) {
     if (!file || !MIME_TYPES.includes(file.type)) fail('请选择 PNG、JPEG 或 WebP 图片，不支持 SVG 或其他文件类型。');
     if (!Number.isSafeInteger(file.size) || file.size < 1) fail('图片文件为空或无法读取。');
-    if (file.size > MAX_BYTES) fail('请选择不超过 500KB 的图片。');
+    if (file.size > MAX_BYTES) fail('请选择不超过 12MB 的图片。');
     return {mime:file.type, size:file.size};
   }
 
@@ -134,33 +136,92 @@ const SumiLogoUpload = (() => {
         image.src = '';
       }, 10000);
       image.onerror = () => finish(reject, new Error('decode-failed'));
-      image.onload = () => finish(resolve, {width:image.naturalWidth, height:image.naturalHeight});
+      image.onload = () => finish(resolve, {width:image.naturalWidth, height:image.naturalHeight, image});
       image.src = url;
     });
   }
 
-  async function read(file, adapters = {}) {
-    const {mime, size} = validateFile(file);
-    let url;
-    try { url = await (adapters.readDataURL || readDataURL)(file); }
-    catch { fail('图片读取失败，请重试。'); }
-    if (typeof url !== 'string' || url.length > Math.ceil(MAX_BYTES / 3) * 4 + 40) invalid();
-    const prefix = 'data:' + mime + ';base64,';
-    if (!url.startsWith(prefix)) invalid();
-    const encoded = url.slice(prefix.length);
-    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) invalid();
-    let bytes;
-    try { bytes = Uint8Array.from(atob(encoded), character => character.charCodeAt(0)); }
-    catch { invalid(); }
-    if (bytes.length !== size) invalid();
-    inspectBytes(bytes, mime);
-    let decoded;
-    try { decoded = await (adapters.decodeImage || decodeImage)(url); }
-    catch { fail('无法读取这张图片，请选择有效的图片文件。'); }
-    dimensions(decoded?.width, decoded?.height);
-    return url;
+  function outputSize(width, height, edge = OUTPUT_EDGE) {
+    dimensions(width, height);
+    const scale = Math.min(1, edge / Math.max(width, height));
+    return {width:Math.max(1, Math.round(width * scale)), height:Math.max(1, Math.round(height * scale))};
   }
 
-  return Object.freeze({MAX_BYTES, MAX_EDGE, MAX_PIXELS, MIME_TYPES, validateFile, inspectBytes, read});
+  function dataBytes(url) {
+    if (typeof url !== 'string' || !/^data:image\/(png|jpeg|webp);base64,(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(url)) invalid();
+    return Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), character => character.charCodeAt(0));
+  }
+
+  // Re-encode every accepted upload to discard metadata and normalize the file.
+  // A bounded canvas keeps the stored image small even for large camera photos.
+  async function compressImage(decoded) {
+    if (!decoded.image) throw new Error('missing-image');
+    const canvas = document.createElement('canvas');
+    try {
+      for (const edge of [OUTPUT_EDGE, 384, 256, 192, 128]) {
+        const size = outputSize(decoded.width, decoded.height, edge);
+        canvas.width = size.width; canvas.height = size.height;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('missing-canvas');
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+        context.drawImage(decoded.image, 0, 0, size.width, size.height);
+        // toBlob avoids the additional synchronous base64 allocation during encode.
+        const blob = await new Promise((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('encode-failed')), 'image/webp', 0.86));
+        if (!['image/webp','image/png'].includes(blob.type)) throw new Error('encode-type');
+        if (blob.size <= OUTPUT_BYTES) return await readDataURL(blob);
+      }
+      throw new Error('encode-too-large');
+    } finally {
+      canvas.width = canvas.height = 1;
+      decoded.image.src = '';
+    }
+  }
+
+  async function read(file, adapters = {}) {
+    const {mime, size} = validateFile(file);
+    let url, objectURL = false;
+    try {
+      // Modern browsers inspect the original bytes and decode a temporary Blob
+      // URL, avoiding a multi-megabyte base64 copy before compression.
+      if (!adapters.readDataURL && typeof file.arrayBuffer === 'function'
+        && typeof URL.createObjectURL === 'function') {
+        let bytes;
+        try { bytes = new Uint8Array(await file.arrayBuffer()); }
+        catch { fail('图片读取失败，请重试。'); }
+        if (bytes.length !== size) invalid();
+        inspectBytes(bytes, mime);
+        try { url = URL.createObjectURL(file); objectURL = true; }
+        catch { fail('图片读取失败，请重试。'); }
+      } else {
+        try { url = await (adapters.readDataURL || readDataURL)(file); }
+        catch { fail('图片读取失败，请重试。'); }
+        if (typeof url !== 'string' || url.length > Math.ceil(MAX_BYTES / 3) * 4 + 40) invalid();
+        const prefix = 'data:' + mime + ';base64,';
+        if (!url.startsWith(prefix)) invalid();
+        const bytes = dataBytes(url);
+        if (bytes.length !== size) invalid();
+        inspectBytes(bytes, mime);
+      }
+      let decoded;
+      try { decoded = await (adapters.decodeImage || decodeImage)(url); }
+      catch { fail('无法读取这张图片，请选择有效的图片文件。'); }
+      dimensions(decoded?.width, decoded?.height);
+      let output;
+      try { output = await (adapters.compressImage || compressImage)(decoded); }
+      catch { fail('图片压缩失败，请重试或选择其他图片。'); }
+      const outputBytes = dataBytes(output);
+      const outputMime = output.slice(5, output.indexOf(';'));
+      const outputInfo = inspectBytes(outputBytes, outputMime);
+      if (outputBytes.length > OUTPUT_BYTES || outputInfo.width > OUTPUT_EDGE || outputInfo.height > OUTPUT_EDGE) {
+        fail('图片压缩失败，请重试或选择其他图片。');
+      }
+      return output;
+    } finally {
+      if (objectURL) URL.revokeObjectURL(url);
+    }
+  }
+
+  return Object.freeze({MAX_BYTES, MAX_EDGE, MAX_PIXELS, OUTPUT_EDGE, OUTPUT_BYTES, MIME_TYPES, validateFile, inspectBytes, outputSize, read});
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = SumiLogoUpload;

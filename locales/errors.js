@@ -6,6 +6,12 @@
 const SumiErrorMessages = (() => {
   const languages = ['zh-CN', 'zh-TW', 'ja-JP', 'en'];
   const rows = [
+    ["图片尺寸过大：每边最多 8192 像素，总像素不超过 4000 万。", "圖片尺寸過大：每邊最多 8192 像素，總像素不超過 4000 萬。", "画像が大きすぎます。各辺8192ピクセル、合計4000万画素まで対応しています。", "The image is too large. Use at most 8192 pixels per side and 40 megapixels."],
+    ["请选择不超过 12MB 的图片。", "請選擇不超過 12MB 的圖片。", "12MB以下の画像を選択してください。", "Choose an image no larger than 12MB."],
+    ["图片压缩失败，请重试或选择其他图片。", "圖片壓縮失敗，請重試或選擇其他圖片。", "画像を圧縮できませんでした。再試行するか、別の画像を選択してください。", "The image could not be compressed. Try again or choose another image."],
+    ["自定义图标无法读取，备份已停止。请恢复图标或移除缺失图标后重试。", "自訂圖示無法讀取，備份已停止。請還原圖示或移除遺失圖示後重試。", "カスタムロゴを読み込めないため、バックアップを中止しました。ロゴを復元するか、見つからないロゴを削除して再試行してください。", "A custom logo could not be read, so the backup was stopped. Restore the image or remove the missing logo and try again."],
+    ["自定义图标数据无效，请重新上传。", "自訂圖示資料無效，請重新上傳。", "カスタムロゴのデータが無効です。もう一度アップロードしてください。", "The custom logo data is invalid. Upload it again."],
+
     ['付款汇率快照无效', '付款匯率快照無效', '支払いの為替レート記録が無効です', 'The payment exchange-rate snapshot is invalid.'],
     ['付款汇率快照与原币金额不一致', '付款匯率快照與原幣金額不一致', '支払いの為替レート記録が元の通貨・金額と一致しません', 'The payment exchange-rate snapshot does not match the original currency and amount.'],
     ['付款汇率确认时间无效', '付款匯率確認時間無效', '支払い為替レートの確認日時が無効です', 'The payment exchange-rate confirmation time is invalid.'],
