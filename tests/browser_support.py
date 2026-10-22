@@ -41,7 +41,7 @@ class Harness:
         return self
 
     def page(self, size=(1440, 1000), data=None, prefs=None, init=None, fx=None):
-        context = self.browser.new_context(viewport={'width': size[0], 'height': size[1]}, timezone_id='Asia/Shanghai', locale='zh-CN', device_scale_factor=1)
+        context = self.browser.new_context(viewport={'width': size[0], 'height': size[1]}, timezone_id='Asia/Shanghai', locale='zh-CN', device_scale_factor=1, service_workers='block')
         context.route('https://cdn.simpleicons.org/**', lambda route: route.abort())
         fx_requests = []
         def fx_route(route):

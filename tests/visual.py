@@ -68,10 +68,12 @@ def capture(folder):
                 page.clock.run_for(350)
                 page.screenshot(path=folder / f'{name}-{view}.png', full_page=True, animations='disabled')
             page.locator('[data-nav=home]').click()
+            page.clock.run_for(350)  # Settle page entry before the next pointer gesture.
             page.locator('[data-add]').click()
             page.clock.run_for(350)
             page.screenshot(path=folder / f'{name}-form.png', full_page=True, animations='disabled')
             page.locator('[data-close]').first.click()
+            page.clock.run_for(350)  # Settle the close transition before opening details.
             target=page.locator('.mobile-subscription').first if name=='phone' else page.locator('tr[data-detail]').first
             target.click()
             page.clock.run_for(350)

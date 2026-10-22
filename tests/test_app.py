@@ -131,7 +131,7 @@ class AppTests(unittest.TestCase):
     def test_export_and_import_round_trip(self):
         self.seed()
         exported=self.export_backup()
-        self.assertEqual(exported, {'version':1,'data':FIXTURE,'preferences':PREFS})
+        self.assertEqual(exported, {'version':1,'data':FIXTURE,'preferences':{**PREFS,'motion':'system'}})
         self.import_backup({'version':1,'data':{'subscriptions':[],'payments':[]},'preferences':PREFS})
         self.import_backup(exported)
         self.page.reload()
@@ -188,7 +188,7 @@ class AppTests(unittest.TestCase):
                     self.page.locator('#exportRaw').click()
                 self.assertEqual(json.loads(Path(d.value.path()).read_text())['raw']['sumi-data-v1'],raw)
                 self.assertEqual(self.export_backup()['raw']['sumi-data-v1'],raw)
-                self.import_backup({'version':1,'data':FIXTURE,'preferences':PREFS})
+                self.import_backup({'version':1,'data':FIXTURE,'preferences':{**PREFS,'motion':'system'}})
                 expect(self.page.locator('[role=alert]')).to_have_count(0)
                 self.assertEqual(self.store(),FIXTURE)
 
@@ -323,7 +323,9 @@ class AppTests(unittest.TestCase):
         expect(self.page.locator('#amount')).to_have_value('36.50')
         expect(self.page.locator('#openPicker img')).to_have_count(1)
         self.submit()
-        self.assertTrue(self.store()['subscriptions'][0]['logo'].startswith('data:image/png;base64,'))
+        reference=self.store()['subscriptions'][0]['logo']
+        self.assertRegex(reference,r'^sumi-logo:[a-f0-9]{64}$')
+        self.assertTrue(self.page.evaluate('(reference)=>SumiLogoStore.resolve(reference)',reference).startswith(('data:image/webp;base64,','data:image/png;base64,')))
 
     def test_failed_renewal_does_not_advance_or_record_payment(self):
         self.add()

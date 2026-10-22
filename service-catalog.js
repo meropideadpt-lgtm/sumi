@@ -926,20 +926,32 @@ const SumiCatalog = (() => {
   const byId = new Map(all.map(entry => [entry.id,entry]));
   const indexed = all.map((entry,index) => ({entry,index,
     terms:[entry.name,entry.id,...entry.aliases].map(normalize), category:normalize(entry.category)}));
+  const exact = new Map(), queries = new Map(), queryLimit = 64;
+  for(const item of indexed)for(const term of item.terms)if(!exact.has(term))exact.set(term,item.entry);
   function get(id) { return typeof id === 'string' ? byId.get(id) || null : null; }
   function findExact(value) {
     const query=normalize(value);
-    return query ? indexed.find(item => item.terms.includes(query))?.entry || null : null;
+    return query ? exact.get(query) || null : null;
   }
   function search(value, {limit=12} = {}) {
     const query=normalize(value), count=Number.isFinite(limit) ? Math.max(0,Math.min(all.length,Math.floor(limit))) : 12;
     if (!query) return all.slice(0,count);
-    return indexed.map(item => {
-      const rank=item.terms.includes(query) ? 0 : item.terms.some(term => term.startsWith(query)) ? 1
-        : item.terms.some(term => term.includes(query)) ? 2 : item.category.includes(query) ? 3 : 4;
-      return {...item,rank};
-    }).filter(item => item.rank<4).sort((a,b) => a.rank-b.rank || a.index-b.index)
-      .slice(0,count).map(item => item.entry);
+    let matches=queries.get(query);
+    if(matches)queries.delete(query);
+    else {
+      // Iteration keeps catalogue order inside each rank without temporary
+      // entry objects or sorting on every keystroke.
+      const ranks=[[],[],[],[]];
+      for(const item of indexed) {
+        const rank=item.terms.includes(query) ? 0 : item.terms.some(term => term.startsWith(query)) ? 1
+          : item.terms.some(term => term.includes(query)) ? 2 : item.category.includes(query) ? 3 : 4;
+        if(rank<4)ranks[rank].push(item.entry);
+      }
+      matches=Object.freeze(ranks.flat());
+    }
+    queries.set(query,matches);
+    if(queries.size>queryLimit)queries.delete(queries.keys().next().value);
+    return matches.slice(0,count);
   }
   return Object.freeze({all,get,findExact,search,normalize});
 })();
