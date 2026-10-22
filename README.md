@@ -4,11 +4,11 @@
 
 ## 部署到 GitHub Pages
 
-1. 将本目录的 **index.html、styles.css、data-store.js、billing.js、icons.js、exchange.js、statistics.js、statistics-view.js、service-catalog.js、logo-upload.js、app.js** 及 **assets/brands/** 上传到仓库根目录，保持文件与目录的相对位置。品牌资源附带的来源及许可证文件也应保留。
+1. 将本目录的 **index.html、styles.css、data-store.js、billing.js、icons.js、exchange.js、statistics.js、statistics-view.js、service-catalog.js、logo-upload.js、i18n.js、theme.js、app.js** 及 **locales/**、**assets/brands/** 上传到仓库根目录，保持文件与目录的相对位置。品牌资源附带的来源及许可证文件也应保留。
 2. 进入仓库 **Settings → Pages → Build and deployment**，Source 选 **Deploy from a branch**，Branch 选正式发布分支，文件夹选 `/(root)`，保存。
 3. 等待 Pages 部署完成，打开 GitHub 显示的网站地址。
 
-开发阶段的 Draft PR 按依赖关系审查，未经统一验收和明确授权不提前合并到 main。
+以上是将来正式发布所需的文件与步骤；第五阶段不部署正式版本。开发阶段的 Draft PR 按依赖关系审查，未经统一验收和明确授权不提前合并到 main。
 
 ## 当前实现
 
@@ -19,6 +19,18 @@
 - 多币种原币金额、统计展示币种、参考汇率缓存及确认付款时的冻结换算。
 - 月度平均成本、年度摊销成本、服务/类别占比、实际付款金额与次数；支持月份、年份和自定义日期范围。
 - JSON 备份/恢复及浏览器 localStorage 持久化；异常数据保护和失败保存恢复。
+- 简体中文、繁體中文、日本語与 English 界面；即时切换并保存选择，日期、数字和金额按语言显示。
+- 浅色、深色及跟随系统三种外观；默认浅色，手动选择持久化，系统模式响应外观变化。
+
+## 语言与外观
+
+在「设置」中选择 `zh-CN`、`zh-TW`、`ja-JP` 或 `en`，界面会立即切换，重新打开应用仍保留选择。默认使用简体中文。页面、订阅与付款弹窗、续费确认、Logo 选择器、错误提示和空状态共用集中管理的翻译资源；缺少当前语言的文案时回退到简体中文，再回退为本地化通用提示，不显示翻译键或 `undefined`。
+
+日期、数字、百分比及货币显示使用 `Intl`。本地化只作用于显示：日期输入和持久化仍使用原 ISO 日期；订阅名称、备注、金额、付款记录、账期和汇率快照不会翻译或重算。已知订阅类别可以显示译名，存储继续保留原类别值；自定义类别和服务品牌名称保持原文，原有中英文与别名搜索继续可用。
+
+外观可选浅色、深色或跟随系统。默认浅色保留原有纯白、极淡蓝设计；深色使用深灰背景、清晰文字、细边框和适度蓝色强调。品牌图片放在适合辨认的浅色底板上，不给品牌图形统一反色。「跟随系统」会响应系统外观变化；手动选择浅色或深色后不随系统切换。主题脚本在样式和应用渲染之前读取已保存选择，以减少首次加载时的主题闪烁。
+
+语言和外观通过偏好设置专用保存路径持久化，保留原有恢复日志、失败回滚和过期页面保护；不会重新序列化旧订阅数据或写入成本观察。实现约定、维护方式与真实设备验收范围见 [国际化与外观记录](docs/i18n-theme.md)。
 
 ## 预置服务、搜索与 Logo
 
@@ -82,13 +94,16 @@
 - 原始扣款日和成本历史从未被旧版保存时，无法完整还原过去；历史付款没有确认汇率时不自动回填。
 - 数据仅保存在当前浏览器，没有账号、云同步或支付平台接入。清理网站数据可能丢失记录，请定期导出备份。
 - localStorage 不提供跨标签页数据库事务；严格同时写入的冲突解决仍需后续数据层设计。
-- 完整国际化尚未实现。部分预置服务尚无可靠本地 Logo，使用中性图标；真实品牌图标的来源及使用限制见品牌资源记录。
+- 部分预置服务尚无可靠本地 Logo，使用中性图标；真实品牌图标的来源及使用限制见品牌资源记录。
+- 原生日期选择器、文件选择器及浏览器确认对话框的系统按钮语言由浏览器/操作系统控制；应用文案与校验提示使用已选语言。不同浏览器的本地化标点、货币间距与字体可能略有差异。
 - 日历展示当前保存的下一次续费日期，不自动展开所有未来周期。
 
 ## 分阶段审查
 
-依赖顺序为 PR #1 `fix/data-reliability-baselines` → PR #2 `feat/billing-mobile-stage2` → PR #3 `feat/statistics-fx-stage3` → PR #4 `feat/service-catalog-stage4`。PR #4 以 PR #3 分支为目标，完整继承前三阶段。所有阶段统一验收并获明确授权后，才按依赖顺序处理合并及目标分支调整。
+依赖顺序为 PR #1 `fix/data-reliability-baselines` → PR #2 `feat/billing-mobile-stage2` → PR #3 `feat/statistics-fx-stage3` → PR #4 `feat/service-catalog-stage4` → PR #5 `feat/i18n-theme-stage5`。PR #5 以 PR #4 分支为目标，完整继承前四阶段，保持独立开发分支和 Draft 状态。所有阶段统一验收并获明确授权后，才按依赖顺序处理合并及目标分支调整。
 
 PR #2 的 [远端 CI](https://github.com/meropideadpt-lgtm/sumi/actions/runs/39769944759) 已于 2026-10-22 完成并通过；浏览器依赖安装耗时较长，最终成功，随后语法、Node 测试、浏览器测试、截图及产物上传均成功。本阶段结果单独记录，不以 PR #2 的通过代替 PR #3 验证。
 
-PR #3 的 [远端 CI](https://github.com/meropideadpt-lgtm/sumi/actions/runs/39774740152) 也已最终成功，验证 head 为 `7ee5bd14cafd78de3fb3ca5085e47577248c45de`。第四阶段在该提交基础上继续开发；其回归结果和 PR #4 CI 应单独核对。
+PR #3 的 [远端 CI](https://github.com/meropideadpt-lgtm/sumi/actions/runs/39774740152) 也已最终成功，验证 head 为 `7ee5bd14cafd78de3fb3ca5085e47577248c45de`。第四阶段在该提交基础上继续开发。
+
+PR #4 的 [远端 CI](https://github.com/meropideadpt-lgtm/sumi/actions/runs/39779083720) 已最终成功，验证 head 为 `7a1e2ba611683fa884bccfdfcd592f8b2399a402`。第五阶段基于该提交开始；PR #5 的最终本地与远端检查应独立核对，不能用父阶段的通过代替。

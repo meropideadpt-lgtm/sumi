@@ -130,7 +130,7 @@ const SumiData = (() => {
   function preferences(value = {}) {
     if (!object(value)) fail('偏好设置无效');
     const p = {...defaults, ...value};
-    if (!currency(p.currency) || ![0,1,3,7,14].includes(p.reminder) || !['light','dark'].includes(p.theme) || p.language !== 'zh-CN') fail('偏好设置无效');
+    if (!currency(p.currency) || ![0,1,3,7,14].includes(p.reminder) || !['light','dark','system'].includes(p.theme) || !['zh-CN','zh-TW','ja-JP','en'].includes(p.language)) fail('偏好设置无效');
     return p;
   }
   function records(value, tolerant = false) {
@@ -218,10 +218,12 @@ const SumiData = (() => {
     return {
       data, preferences:prefs, issues,
       rawBackup: () => ({version:1, raw:{...raw}}),
-      write(nextData, nextPrefs, recovery = false) {
+      writePreferences(nextPrefs) { this.write(null, nextPrefs, false, true); },
+      write(nextData, nextPrefs, recovery = false, preferencesOnly = false) {
         if (!readable || (blocked && !recovery)) fail(issues.join(' '));
-        const checked = records(nextData).data, p = preferences(nextPrefs);
-        const next = {[STORE]:JSON.stringify(checked), [PREF]:JSON.stringify(p)};
+        const p = preferences(nextPrefs);
+        // Display preferences must not normalize or reserialize legacy business records.
+        const next = {[STORE]:preferencesOnly ? raw[STORE] : JSON.stringify(records(nextData).data), [PREF]:JSON.stringify(p)};
         let journalWritten = false;
         try {
           if (storage.getItem(JOURNAL) !== null || [STORE,PREF].some(key => storage.getItem(key) !== raw[key])) {

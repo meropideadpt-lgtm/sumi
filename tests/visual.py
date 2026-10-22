@@ -6,7 +6,7 @@ from PIL import Image, ImageChops
 from browser_support import Harness, FIXTURE, PREFS, SIZES
 
 ROOT = Path(__file__).resolve().parent
-BASELINE_COUNT = 34
+BASELINE_COUNT = 46
 
 def statistics_history_fixture():
     """Synthetic observed plans and successful payments, never live financial data."""
@@ -123,6 +123,51 @@ def capture(folder):
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
             page.screenshot(path=folder/f'{name}-logo-picker.png',full_page=True,animations='disabled')
             page.context.close()
+
+        # Stage five: translated dark surfaces, narrow dialogs, and long locale labels.
+        appearance_data=statistics_history_fixture()
+        appearance_data['subscriptions'][0].update(nextDate='2026-10-31',billingAnchor='2024-10-31')
+        dark_prefs={**PREFS,'language':'en','theme':'dark'}
+        def capture_appearance(page, filename):
+            page.clock.run_for(350)
+            page.wait_for_function("Array.from(document.querySelectorAll('img.logo')).every(image=>image.complete&&image.naturalWidth>0)")
+            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            page.screenshot(path=folder/filename,full_page=True,animations='disabled')
+        def full_statistics(page):
+            page.locator('[data-nav=stats]').click()
+            page.locator('#statsMode').select_option('custom')
+            page.locator('#statsStart').fill('2024-01-01')
+            page.locator('#statsEnd').fill('2026-10-22')
+            page.locator('#statsFilters [type=submit]').click()
+            assert page.locator('[data-chart=monthly] .stats-bar').count()>12
+            assert page.locator('[data-chart=annual] .stats-bar').count()==3
+        page=h.page(SIZES['desktop'],appearance_data,dark_prefs)
+        for view in ['home','list','stats','calendar','settings']:
+            if view=='stats':full_statistics(page)
+            else:page.locator(f'[data-nav={view}]').click()
+            capture_appearance(page,f'desktop-en-dark-{view}.png')
+        page.context.close()
+        page=h.page(SIZES['phone'],appearance_data,dark_prefs)
+        capture_appearance(page,'phone-en-dark-home.png')
+        page.locator('[data-add]').click()
+        capture_appearance(page,'phone-en-dark-form.png')
+        page.locator('#openPicker').click()
+        capture_appearance(page,'phone-en-dark-logo-picker.png')
+        page.context.close()
+        page=h.page(SIZES['ipad'],appearance_data,dark_prefs)
+        full_statistics(page)
+        capture_appearance(page,'ipad-en-dark-stats.png')
+        page.locator('[data-nav=calendar]').click()
+        capture_appearance(page,'ipad-en-dark-calendar.png')
+        page.context.close()
+        page=h.page(SIZES['phone'],FIXTURE,{**PREFS,'language':'zh-TW'})
+        page.locator('[data-nav=settings]').click()
+        capture_appearance(page,'phone-zh-TW-light-settings.png')
+        page.context.close()
+        page=h.page(SIZES['ipad'],FIXTURE,{**PREFS,'language':'ja-JP'})
+        page.locator('[data-add]').click()
+        capture_appearance(page,'ipad-ja-JP-light-form.png')
+        page.context.close()
 
 def compare(expected, actual):
     failures = []
