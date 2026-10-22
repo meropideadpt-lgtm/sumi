@@ -20,7 +20,8 @@ jobs:
           node-version: '24'
       - run: python -m pip install -r tests/requirements.txt
       - run: python -m playwright install --with-deps chromium
-      - run: node --check app.js && node --check data-store.js
+      - run: node --check app.js && node --check data-store.js && node --check billing.js && node --check icons.js
+      - run: node --test tests/test_*.cjs
       - run: python -m unittest discover -s tests -p 'test_*.py' -v
       - name: Capture layouts for review
         run: python tests/visual.py --capture tests/artifacts/ci-visual

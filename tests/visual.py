@@ -1,11 +1,12 @@
 """Capture or compare deterministic screenshots. Updating baselines is explicit."""
 from pathlib import Path
 import argparse
-import json
+import copy
 from PIL import Image, ImageChops
 from browser_support import Harness, FIXTURE, PREFS, SIZES
 
 ROOT = Path(__file__).resolve().parent
+BASELINE_COUNT = 25
 
 def capture(folder):
     folder.mkdir(parents=True, exist_ok=True)
@@ -14,11 +15,28 @@ def capture(folder):
             page = h.page(size, FIXTURE, PREFS)
             for view in ['home', 'list', 'stats', 'calendar', 'settings']:
                 page.locator(f'[data-nav={view}]').click()
+                page.clock.run_for(350)
                 page.screenshot(path=folder / f'{name}-{view}.png', full_page=True, animations='disabled')
             page.locator('[data-nav=home]').click()
             page.locator('[data-add]').click()
+            page.clock.run_for(350)
             page.screenshot(path=folder / f'{name}-form.png', full_page=True, animations='disabled')
+            page.locator('[data-close]').first.click()
+            target=page.locator('.mobile-subscription').first if name=='phone' else page.locator('tr[data-detail]').first
+            target.click()
+            page.clock.run_for(350)
+            page.screenshot(path=folder / f'{name}-detail.png', full_page=True, animations='disabled')
+            page.locator('[data-payment]').click()
+            page.clock.run_for(350)
+            page.screenshot(path=folder / f'{name}-payment.png', full_page=True, animations='disabled')
             page.context.close()
+        due=copy.deepcopy(FIXTURE)
+        due['subscriptions'][0]['nextDate']='2026-10-21'
+        due['subscriptions'][1]['nextDate']='2026-10-22'
+        page=h.page(SIZES['phone'],due,PREFS)
+        page.clock.run_for(350)
+        page.screenshot(path=folder/'phone-reminders.png',full_page=True,animations='disabled')
+        page.context.close()
 
 def compare(expected, actual):
     failures = []
@@ -45,9 +63,9 @@ if __name__ == '__main__':
     destination = args.capture or ROOT/'artifacts'/'visual'
     capture(destination)
     if not args.capture:
-        if len(list(args.against.glob('*.png'))) != 18:
-            raise SystemExit('Expected 18 reviewed baselines')
+        if len(list(args.against.glob('*.png'))) != BASELINE_COUNT:
+            raise SystemExit(f'Expected {BASELINE_COUNT} reviewed baselines')
         failures = compare(args.against, destination)
-        print('\n'.join(failures) if failures else 'PASS: 18 visual baselines')
+        print('\n'.join(failures) if failures else f'PASS: {BASELINE_COUNT} visual baselines')
         raise SystemExit(bool(failures))
-    print(f'Captured 18 screenshots in {destination}')
+    print(f'Captured {BASELINE_COUNT} screenshots in {destination}')

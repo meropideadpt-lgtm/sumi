@@ -34,6 +34,15 @@ const SumiData = (() => {
     if (!currencies.includes(value.currency)) fail('订阅币种无效');
     if (![1,3,6,12].includes(value.months)) fail('订阅周期无效');
     if (!date(value.nextDate)) fail('续费日期无效');
+    if (value.billingAnchor !== undefined) {
+      if (!date(value.billingAnchor)) fail('账期锚点无效');
+      const monthsBetween = (Number(value.nextDate.slice(0,4)) - Number(value.billingAnchor.slice(0,4))) * 12
+        + Number(value.nextDate.slice(5,7)) - Number(value.billingAnchor.slice(5,7));
+      const end = new Date(value.nextDate + 'T12:00:00Z');
+      end.setUTCMonth(end.getUTCMonth()+1, 0);
+      const expectedDay = Math.min(Number(value.billingAnchor.slice(8)), end.getUTCDate());
+      if (monthsBetween % value.months !== 0 || Number(value.nextDate.slice(8)) !== expectedDay) fail('续费日期与账期锚点不一致');
+    }
     if (value.status !== undefined && !['active','cancelled'].includes(value.status)) fail('订阅状态无效');
     if (value.autoRenew !== undefined && typeof value.autoRenew !== 'boolean') fail('自动续费设置无效');
     if (value.logo !== undefined && (typeof value.logo !== 'string' || (value.logo && !safeLogo(value.logo)))) fail('图标地址无效');
@@ -44,6 +53,11 @@ const SumiData = (() => {
     text(value.id, '付款编号'); text(value.subscriptionId, '付款订阅编号'); text(value.name, '付款名称', 70);
     if (!amount(value.amount) || !currencies.includes(value.currency)) fail('付款金额或币种无效');
     if (!date(value.date) || (value.cycleDate !== undefined && !date(value.cycleDate))) fail('付款日期无效');
+    if (value.status !== undefined && !['succeeded','failed'].includes(value.status)) fail('付款状态无效');
+    if (value.advancesSchedule !== undefined && typeof value.advancesSchedule !== 'boolean') fail('付款账期标记无效');
+    if (value.advancesSchedule === true && value.cycleDate === undefined) fail('推进账期的付款必须关联账期日期');
+    if (value.scheduleArchived !== undefined && typeof value.scheduleArchived !== 'boolean') fail('历史账期标记无效');
+    if (value.scheduleArchived === true && (value.cycleDate === undefined || value.advancesSchedule !== false)) fail('历史账期必须保留日期且不能推进当前账期');
     return {...value};
   }
   function preferences(value = {}) {
@@ -57,12 +71,17 @@ const SumiData = (() => {
     const issues = [];
     const result = {...value};
     for (const [key, validate] of [['subscriptions',subscription],['payments',payment]]) {
-      const ids = new Set();
+      const ids = new Set(), paidCycles = new Set();
       result[key] = [];
       value[key].forEach((record, index) => {
         try {
           const checked = validate(record);
           if (ids.has(checked.id)) fail('编号重复');
+          if (key === 'payments' && checked.status !== 'failed' && checked.cycleDate !== undefined) {
+            const cycleKey = JSON.stringify([checked.subscriptionId, checked.cycleDate]);
+            if (paidCycles.has(cycleKey)) fail('同一订阅账期已记录成功付款');
+            paidCycles.add(cycleKey);
+          }
           ids.add(checked.id); result[key].push(checked);
         } catch (error) {
           if (!tolerant) fail(`${key === 'subscriptions' ? '订阅' : '付款'}第 ${index+1} 条：${error.message}`);
