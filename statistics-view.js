@@ -1,6 +1,7 @@
 /* Presentation for the independent statistics page; calculations stay in statistics.js. */
 function sumiStatisticsView(model, filters, helpers) {
   const esc = helpers.esc;
+  const brand = (name, subscriptionId) => typeof helpers.logo === 'function' ? helpers.logo(name, subscriptionId) : '';
   const money = value => typeof value === 'number' && Number.isFinite(value) ? esc(helpers.money(value)) : '暂无数据';
   const selected = mode => filters.mode === mode ? 'selected' : '';
   const input = (id,label,type,value,attrs='') => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="${type}" value="${esc(value || '')}" ${attrs}></div>`;
@@ -42,7 +43,8 @@ function sumiStatisticsView(model, filters, helpers) {
     const content = rows.length ? `<div class="stats-share-list">${rows.map(row => {
       const known = typeof row.amount === 'number' && Number.isFinite(row.amount);
       const ratio = typeof row.percentage === 'number' && Number.isFinite(row.percentage) ? Math.max(0,Math.min(100,row.percentage)) : null;
-      return `<div class="stats-share-row"><div class="stats-share-label"><span>${esc(row.name)}</span><strong>${known?money(row.amount):'无法换算'}${ratio!==null?' · '+ratio.toFixed(1)+'%':''}</strong></div><div class="stats-share-track" aria-hidden="true">${ratio!==null?`<div style="width:${ratio}%"></div>`:''}</div></div>`;
+      const label = kind === 'service' ? `<div class="stats-service">${brand(row.name,row.subscriptionId)}<span>${esc(row.name)}</span></div>` : `<span>${esc(row.name)}</span>`;
+      return `<div class="stats-share-row"><div class="stats-share-label">${label}<strong>${known?money(row.amount):'无法换算'}${ratio!==null?' · '+ratio.toFixed(1)+'%':''}</strong></div><div class="stats-share-track" aria-hidden="true">${ratio!==null?`<div style="width:${ratio}%"></div>`:''}</div></div>`;
     }).join('')}</div>` : '<div class="stats-empty">该期间暂无费用记录。</div>';
     return `<section class="card" data-shares="${kind}"><div class="section-title"><h2>${title}</h2></div>${content}<p class="note">按所选期间已记录的摊销成本计算${model.missingFx?'，缺少汇率时不计算完整占比':''}。</p></section>`;
   }
@@ -54,7 +56,7 @@ function sumiStatisticsView(model, filters, helpers) {
     const rateNote = p.fxSnapshot?.status === 'available'
       ? p.fxSnapshot.provider === 'identity' ? '原币金额，无需换算' : '确认时参考汇率 · '+esc(p.fxSnapshot.date || '')
       : p.fxSnapshot?.status === 'unavailable' ? '确认时无可用汇率' : '旧记录未保存历史汇率';
-    return `<div class="payment" data-payment-id="${esc(p.id)}"><div><strong>${esc(p.name)}</strong><div class="small">${esc(p.date)} · ${original}</div><div class="small">${rateNote}</div></div><strong>${converted}</strong></div>`;
+    return `<div class="payment" data-payment-id="${esc(p.id)}"><div class="stats-service">${brand(p.name,p.subscriptionId)}<div class="stats-service-copy"><strong>${esc(p.name)}</strong><div class="small">${esc(p.date)} · ${original}</div><div class="small">${rateNote}</div></div></div><strong>${converted}</strong></div>`;
   }).join('')}</div>` : '<div class="stats-empty">该期间暂无成功付款记录。</div>';
   const originalTotals = model.originalCurrencyTotals?.length ? `<div class="stats-original-totals" aria-label="按原始币种汇总">${model.originalCurrencyTotals.map(row=>`<span class="pill">${esc(helpers.original(row.amount,row.currency))} · ${Number(row.count)} 笔</span>`).join('')}</div>` : '';
   return filterHtml + `<p class="stats-period small">${esc(rangeText)}${range.end && range.effectiveEnd && range.end > range.effectiveEnd?' · 未来日期不计入统计':''}</p>` + summary

@@ -43,6 +43,32 @@ test('startup never rewrites valid old localStorage strings', () => {
   assert.deepEqual(storage.mutations, []);
 });
 
+test('local brand assets and explicit logo removal round-trip without changing other data', () => {
+  for (const logo of ['assets/brands/github.svg', 'assets/brands/youtube-premium.svg', '',
+    'https://cdn.simpleicons.org/github', 'data:image/png;base64,aGVsbG8=']) {
+    const original=backup([paid()], [sub({logo, extra:{keep:true}})]);
+    assert.deepEqual(check(original).data,original.data);
+    const raw=JSON.stringify(original.data,null,2);
+    const store=memory({'sumi-data-v1':raw,'sumi-fx-cache-v1':'unchanged cache'});
+    const opened=api.open(store);
+    assert.equal(opened.issues.length,0);
+    assert.equal(store.getItem('sumi-data-v1'),raw);
+    assert.equal(store.getItem('sumi-fx-cache-v1'),'unchanged cache');
+    assert.deepEqual(store.mutations,[]);
+  }
+});
+
+test('local logo paths cannot escape brand assets or import executable image data', () => {
+  for (const logo of ['assets/brands/../other.svg','../assets/brands/github.svg',
+    '/assets/brands/github.svg','assets/brands/github.svg?x=1','assets/brands/github.svg#x',
+    'assets/brands/%2e%2e/file.svg','assets/brands/github.png','assets/brands/a/b.svg',
+    'assets/brands/evil\" onerror=\"alert(1).svg','data:image/svg+xml;base64,PHN2Zz4=',
+    'javascript:alert(1)','//example.com/icon.svg']) {
+    assert.equal(api.safeLogo(logo),'');
+    assert.throws(()=>check(backup([], [sub({logo})])),/图标/);
+  }
+});
+
 test('anchored monthly dates allow clamping then return to the original day', () => {
   for (const nextDate of ['2026-01-31', '2026-02-28', '2026-03-31', '2025-12-31']) {
     assert.equal(api.subscription(sub({billingAnchor:'2026-01-31',nextDate})).nextDate, nextDate);

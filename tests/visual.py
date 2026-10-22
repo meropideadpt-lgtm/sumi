@@ -6,7 +6,7 @@ from PIL import Image, ImageChops
 from browser_support import Harness, FIXTURE, PREFS, SIZES
 
 ROOT = Path(__file__).resolve().parent
-BASELINE_COUNT = 28
+BASELINE_COUNT = 34
 
 def statistics_history_fixture():
     """Synthetic observed plans and successful payments, never live financial data."""
@@ -100,6 +100,28 @@ def capture(folder):
             assert page.locator('.stats-payments .payment').count()==4
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
             page.screenshot(path=folder/f'{name}-stats-history.png',full_page=True,animations='disabled')
+            page.context.close()
+        for name, size in SIZES.items():
+            page=h.page(size,FIXTURE,PREFS)
+            page.locator('[data-add]').click()
+            page.locator('#name').fill('音乐')
+            page.locator('#name').press('ArrowDown')
+            page.clock.run_for(350)
+            assert page.locator('#suggestions [data-suggest]').count()>1
+            assert page.locator('#suggestions [aria-selected=true]').count()==1
+            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            page.screenshot(path=folder/f'{name}-service-search.png',full_page=True,animations='disabled')
+            page.locator('#name').press('Escape')
+            page.locator('#name').fill('Netflix')
+            page.locator('#name').press('ArrowDown')
+            page.locator('#name').press('Enter')
+            page.locator('#openPicker').click()
+            page.clock.run_for(350)
+            page.wait_for_function("Array.from(document.querySelectorAll('#pickerOverlay img')).every(image=>image.complete&&image.naturalWidth>0)")
+            assert page.locator('#pickerResults [data-pick]').count()>=50
+            assert page.locator('#pickerResults .logo.fallback').count()>0
+            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            page.screenshot(path=folder/f'{name}-logo-picker.png',full_page=True,animations='disabled')
             page.context.close()
 
 def compare(expected, actual):
