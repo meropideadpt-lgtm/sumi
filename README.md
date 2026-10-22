@@ -5,7 +5,7 @@
 ## 部署到 GitHub Pages
 
 1. 在 GitHub 新建仓库 `sumi`。
-2. 将本目录的 **index.html、styles.css、app.js、README.md** 上传到仓库根目录（不要只上传 zip）。
+2. 将本目录的 **index.html、styles.css、data-store.js、app.js、README.md** 上传到仓库根目录（不要只上传 zip）。
 3. 进入仓库 **Settings → Pages → Build and deployment**，Source 选 **Deploy from a branch**，Branch 选 `main`，文件夹选 `/(root)`，保存。
 4. 等待 Pages 部署完成，打开 GitHub 显示的网站地址。
 
@@ -26,8 +26,14 @@
 - 数据只保存在当前浏览器的 localStorage，换设备不会同步。清理网站数据可能丢失记录，请导出 JSON 备份。
 - 付款确认和周期推进为初版逻辑，跨多期未付款、价格变更历史、账单重试等边界情形仍需 Codex 完善。
 - 日历只展示当前保存的下一次续费日期，不自动生成所有未来周期。
-- 还未完成浏览器端自动化测试和跨设备验收。
+- 已加入核心交互自动化测试与桌面/iPad/手机尺寸截图基线；真实设备及 Safari 验收仍待补充。
 
 ## 给 Codex 的下一步
 
 先审查现有代码并建立自动化测试，再迁移到 React + TypeScript + Vite，保持现有设计方向和已实现的数据交互；引入 IndexedDB、汇率缓存与历史汇率、准确的月度成本快照、国际化、完整图标库、付款历史编辑及 PWA。不要在迁移时丢失已有 localStorage 数据；先做数据迁移方案。请用 PR 分阶段提交，保留可运行的 GitHub Pages 部署。
+
+## 本地开发与测试
+
+运行 `python3 -m http.server 8000` 即可启动静态网站。应用没有构建步骤或生产依赖。
+
+测试环境安装、回归命令、视觉基线及异常数据恢复方式见 [tests/README.md](tests/README.md)。保留原有 `sumi-data-v1` / `sumi-prefs-v1` 存储格式；遇到异常数据时请先导出原始数据，再用确认完整的备份恢复。
