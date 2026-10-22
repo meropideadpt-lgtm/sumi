@@ -156,3 +156,68 @@ body.dark .stats-share-track>div{background:#7098ce}
 @media(max-width:420px){
   .form-grid>.category-field{grid-column:2}
 }
+/* Stage four: quiet service search and one shared treatment for brand images. */
+.logo.fallback{color:#97a7bd;font-weight:400}
+.logo.fallback .icon{width:100%;height:100%;max-width:25px;max-height:25px;margin:0}
+.logo-picker>.logo{width:60px;height:60px;border-radius:13px;padding:10px}
+.logo-picker>.logo.fallback .icon{max-width:30px;max-height:30px}
+.detail-hero .logo.fallback .icon{max-width:34px;max-height:34px}
+.service-autocomplete{position:relative;min-width:0}
+.service-suggestions{position:relative;z-index:1;display:grid;gap:2px;margin:0;padding:4px;border:1px solid #e5eaf3;border-radius:11px;background:#fff;box-shadow:0 6px 18px rgba(25,43,72,.06);max-height:208px;overflow:auto;overscroll-behavior:contain}
+.service-suggestions:empty,.service-suggestions[hidden]{display:none}
+.service-suggestion{display:flex;align-items:center;gap:9px;min-height:48px;width:100%;padding:7px;border:0;border-radius:7px;background:#fff;color:inherit;text-align:left;line-height:1.4;transition:background-color .15s ease}
+.service-suggestion:hover,.service-suggestion.is-active,.service-suggestion[aria-selected=true]{background:#f0f5fd}
+.service-suggestion:focus-visible{outline-offset:-2px}
+.service-suggestion .logo{width:30px;height:30px;border-radius:8px;padding:5px}
+.suggestion-copy{display:grid;gap:2px;min-width:0;overflow-wrap:anywhere}
+.suggestion-copy strong{font-size:12px;font-weight:650}
+.suggestion-copy small,.suggestion-copy .small{font-size:10px;color:#98a5b7}
+.suggestion-empty{margin:0;padding:10px 8px;font-size:12px;line-height:1.6;color:#8e9bae;overflow-wrap:anywhere}
+#pickerOverlay{padding:16px;z-index:20}
+#pickerOverlay .logo-modal{width:min(520px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);padding:24px;overscroll-behavior:contain}
+.logo-modal .modal-head{margin-bottom:18px}
+.logo-modal .modal-head h2{font-size:19px}
+.logo-modal .search{width:100%;min-width:0;min-height:44px;margin-bottom:16px}
+.logo-modal #pickerSearch{margin-top:7px}
+.logo-modal .picker-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;max-height:300px;padding:3px;scroll-padding:3px}
+.logo-modal .pick-item{min-height:96px;min-width:0;padding:10px 5px;align-content:start;line-height:1.4;overflow-wrap:anywhere;transition:background-color .15s ease,border-color .15s ease}
+.logo-modal .pick-item .logo{width:38px;height:38px;border-radius:10px}
+.logo-modal .pick-item>span{min-width:0;max-width:100%}
+.logo-modal .pick-item .small{font-size:10px;line-height:1.3}
+.logo-modal .pick-item[aria-pressed=true]{background:#f0f5fd;border-color:#b6cee9}
+.logo-modal .pick-item:focus-visible{outline-offset:-2px}
+.picker-empty{grid-column:1/-1;margin:0;padding:20px 8px;text-align:center;line-height:1.8}
+.picker-current{display:flex;align-items:center;gap:12px;margin:0 0 16px;padding:12px;background:#f7faff;border:1px solid #edf1f7;border-radius:12px;min-width:0}
+.picker-current>.logo{width:44px;height:44px;border-radius:11px;padding:8px}
+.picker-current>div{min-width:0;overflow-wrap:anywhere}
+.picker-current strong{font-size:13px}
+.picker-current .small{display:block;margin-top:3px;line-height:1.5}
+.logo-actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.logo-actions>.secondary,.logo-actions>.linkbtn{min-height:44px;display:flex;align-items:center;justify-content:center;flex:1;min-width:0;text-align:center;font-size:12px}
+.logo-actions label{cursor:pointer}
+.logo-error{font-size:12px;line-height:1.7;color:#a66e6e;overflow-wrap:anywhere;margin:10px 0 0}
+.logo-error:empty,.logo-upload-status:empty{display:none}
+.logo-upload-status{font-size:12px;line-height:1.7;color:#8798af;margin:10px 0 0}
+.stats-service{display:flex;align-items:center;gap:10px;min-width:0}
+.stats-service>.logo{width:32px;height:32px;border-radius:9px;padding:6px}
+.stats-service>span,.stats-service-copy{min-width:0;overflow-wrap:anywhere}
+.stats-share-label>.stats-service{flex:1}
+.stats-share-label{align-items:center}
+.stats-payments .stats-service{align-items:flex-start}
+body.dark .service-suggestions,body.dark .service-suggestion{background:#1c2635;border-color:#2b3a4d}
+body.dark .service-suggestion:hover,body.dark .service-suggestion.is-active,body.dark .service-suggestion[aria-selected=true],body.dark .picker-current,body.dark .logo-modal .pick-item[aria-pressed=true]{background:#263b58;border-color:#3b5576}
+@media(max-width:720px){
+  .logo-modal .picker-grid{grid-template-columns:repeat(3,minmax(0,1fr));max-height:280px}
+  .logo-picker>.logo{width:52px;height:52px;padding:8px}
+  .stats-service{gap:8px}
+}
+@media(max-width:420px){
+  #pickerOverlay{padding:12px}
+  #pickerOverlay .logo-modal{padding:18px;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px)}
+  .logo-modal .picker-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .logo-modal .pick-item{min-height:90px}
+  .service-suggestions{max-height:182px}
+  .service-suggestion{gap:7px;padding:6px 5px}
+  .stats-share-label>.stats-service{flex:1 1 50%}
+  .stats-share-label>.stats-service+strong{max-width:50%}
+}

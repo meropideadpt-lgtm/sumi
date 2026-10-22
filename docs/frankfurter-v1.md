@@ -13,6 +13,7 @@
 | [Quote::EndOfDay](https://github.com/lineofflight/frankfurter/blob/fe133cda3a235dca38a88da2eb70126ce1044b8a/lib/versions/v1/quote/end_of_day.rb) | 返回 `amount`、`base`、`date`、`rates`；使用 ECB 参考数据 |
 | [CurrencyNames](https://github.com/lineofflight/frankfurter/blob/fe133cda3a235dca38a88da2eb70126ce1044b8a/lib/versions/v1/currency_names.rb) | 币种目录来自 ECB 数据并包含 EUR，实际目录随数据变化 |
 | [v1 路由与弃用声明](https://github.com/lineofflight/frankfurter/blob/fe133cda3a235dca38a88da2eb70126ce1044b8a/lib/versions/v1.rb) | v1 标记 deprecated，弃用时间戳对应 2026-05-18，后继版本为 v2 |
+| [应用 CORS 配置](https://github.com/lineofflight/frankfurter/blob/fe133cda3a235dca38a88da2eb70126ce1044b8a/lib/app.rb) | 源码配置 `origins "*"`、允许 GET/OPTIONS 及任意请求头；这不能代替线上响应头验证 |
 
 默认 `/latest` 响应结构为：
 
@@ -33,13 +34,29 @@ v1 已被官方标记弃用，但本轮仍保留指定版本。将来迁移 v2 �
 
 ## 当前真实请求验证状态
 
-2026-10-22，在本轮云环境中请求以下地址，均于代理 CONNECT 阶段返回 HTTP 403：
+2026-10-22，第三阶段在云环境中请求以下地址，均于代理 CONNECT 阶段返回 HTTP 403：
 
 - `https://frankfurter.dev/`
 - `https://api.frankfurter.dev/v1/latest`
 - `https://api.frankfurter.dev/v1/currencies`
 
-因此本轮尚未验证真实响应内容、实时币种目录或部署站点的浏览器跨域行为。不能将官方源码核对或测试模拟称为真实 API 联调成功。环境草稿已记录 `frankfurter.dev` 与 `api.frankfurter.dev` 的网络需求；应用不需要任何密钥。
+因此云环境尚未直接验证真实响应内容、实时币种目录或部署站点的浏览器跨域行为。不能将官方源码核对或测试模拟称为真实 API 联调成功。环境草稿已记录 `frankfurter.dev` 与 `api.frankfurter.dev` 的网络需求；应用不需要任何密钥。
+
+第四阶段开始时，用户报告已在 iPad Safari 地址栏直接打开：
+
+```text
+https://api.frankfurter.dev/v1/latest?base=USD&symbols=CNY
+```
+
+并得到以下真实响应（用户提供，未由本轮云环境重新抓取）：
+
+```json
+{"amount":1.0,"base":"USD","date":"2026-10-21","rates":{"CNY":6.6761}}
+```
+
+这证明用户该设备的网络能够直接访问这一接口。地址栏导航不受网页 `fetch` 的跨域读取规则约束，因此尚不能证明 sumi 页面内的 CORS、缓存、手动刷新或其他 Safari 交互已经通过。应用请求默认 EUR 基准的完整 `/latest` 和 `/currencies`；上述 USD/CNY 单一报价不是应用所需的完整缓存，不能直接替换它。
+
+第四阶段只读复核确认：应用使用普通跨域 GET 和 `Accept: application/json`，没有 `no-cors`、跨域凭据或自定义认证头；手动刷新与 24 小时缓存判断、失败保留旧缓存及付款冻结逻辑继续保留。官方源码的 CORS 配置与这类请求兼容，但线上部署响应头和 iPad Safari 实际行为仍未实测。现有 22 项汇率单元测试通过；PR #3 的[远端 CI](https://github.com/meropideadpt-lgtm/sumi/actions/runs/39774740152) 已于 2026-10-22 12:03:33 UTC 完成并成功，验证的 head 为 `7ee5bd14cafd78de3fb3ca5085e47577248c45de`。
 
 环境允许访问后，可执行下列只读检查，保持 TLS 验证开启：
 
@@ -49,6 +66,13 @@ curl --fail-with-body --silent --show-error --max-time 20 https://api.frankfurte
 ```
 
 随后还需在部署页面检查浏览器获取、手动刷新、离线回退，以及日期与币种覆盖提示。遇到 HTTP、解析或结构错误，应保留最近一次成功缓存，不能放宽校验来让请求看似成功。
+
+真实 iPad Safari 验收可使用独立测试数据，按以下顺序记录结果；这些步骤目前仍为待验证项：
+
+1. 打开实际 sumi 页面，在设置中点击「手动刷新汇率」，确认 `/latest` 与 `/currencies` 的网页请求成功，参考日期和最近成功获取时间有显示，且没有 CORS 错误。
+2. 刷新成功后重新打开页面，确认 24 小时内复用缓存；再次手动刷新应发起一次新的获取过程，快速重复操作不应产生并发重复请求。
+3. 页面保持打开并关闭网络后手动刷新，确认明确显示失败或旧缓存状态，原参考日期、成功时间、订阅及付款数据保持不变。静态页面本身没有离线安装功能，完全离线时重新打开站点不在此项保证范围内。
+4. 用测试订阅确认付款，再刷新汇率及切换展示币种，确认原币金额和已保存的冻结快照不被新报价改写，并检查触控、软键盘和窄屏提示是否正常。
 
 ## 缓存与异常处理
 

@@ -1,5 +1,5 @@
-const $=s=>document.querySelector(s);const services=['ChatGPT','Claude','Gemini','DeepSeek','Netflix','YouTube','Spotify','Apple Music','iCloud','Disney+','GagaOOLala','哔哩哔哩','爱奇艺','腾讯视频','优酷','网易云音乐','QQ音乐','WPS','Microsoft 365','Google One','百度网盘','夸克网盘','京东 PLUS','淘宝 88VIP','Notion','Figma','Canva','Dropbox','GitHub','Nintendo','PlayStation','Xbox','Amazon Prime'];const icons={'ChatGPT':'openai','Claude':'anthropic','Gemini':'googlegemini','DeepSeek':'deepseek','Netflix':'netflix','YouTube':'youtube','Spotify':'spotify','Apple Music':'applemusic','iCloud':'icloud','Disney+':'disneyplus','GagaOOLala':'','哔哩哔哩':'bilibili','爱奇艺':'iqiyi','腾讯视频':'tencentvideo','优酷':'youku','网易云音乐':'neteasecloudmusic','QQ音乐':'qqmusic','WPS':'wps','Microsoft 365':'microsoft','Google One':'google','百度网盘':'baidu','夸克网盘':'','京东 PLUS':'jd','淘宝 88VIP':'taobao','Notion':'notion','Figma':'figma','Canva':'canva','Dropbox':'dropbox','GitHub':'github','Nintendo':'nintendo','PlayStation':'playstation','Xbox':'xbox','Amazon Prime':'amazonprime'};const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const storage=SumiData.open({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value),removeItem:key=>localStorage.removeItem(key)});
-let data=storage.data,preferences=storage.preferences,view='home',filter='',statusFilter='all',modal=null,detailId=null,picker=false,selectedLogo='',pickerSearch='',calOffset=0,formDraft=null,paymentModal=null,paymentDraft=null,confirming=false,uploadGeneration=0,uiReady=false,statsFilters={mode:'year',year:today().slice(0,4),month:today().slice(0,7),start:today().slice(0,4)+'-01-01',end:today(),error:''};
+const $=s=>document.querySelector(s);const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const storage=SumiData.open({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value),removeItem:key=>localStorage.removeItem(key)});
+let data=storage.data,preferences=storage.preferences,view='home',filter='',statusFilter='all',modal=null,detailId=null,picker=false,selectedLogo='',pickerSearch='',calOffset=0,formDraft=null,paymentModal=null,paymentDraft=null,confirming=false,uploadGeneration=0,logoUploading=false,logoError='',suggestionsOpen=false,suggestionIndex=-1,suggestionResults=[],nameComposing=false,pickerComposing=false,fxRenderPending=false,uiReady=false,statsFilters={mode:'year',year:today().slice(0,4),month:today().slice(0,7),start:today().slice(0,4)+'-01-01',end:today(),error:''};
 const currencySymbol={CNY:'¥',USD:'$',JPY:'¥',HKD:'HK$',TWD:'NT$',EUR:'€',GBP:'£',KRW:'₩'};
 const converted=(amount,from,to=preferences.currency)=>referenceQuote(Number(amount),from,to).rawAmount;
 const original=(amount,cur)=>`${cur} ${Number(amount).toFixed(2)}`;
@@ -7,11 +7,11 @@ const active=s=>s.status!=='cancelled';
 const monthly=s=>{const value=converted(s.amount,s.currency);return value===null?null:value/s.months};
 const total=()=>{const values=data.subscriptions.filter(active).map(monthly);return values.some(value=>value===null)?null:values.reduce((sum,value)=>sum+value,0)};
 const moneyDisplay=value=>typeof value!=='number'||!Number.isFinite(value)?'待换算':`${currencySymbol[preferences.currency]||preferences.currency} ${value.toLocaleString('zh-CN',{minimumFractionDigits:new Intl.NumberFormat('en',{style:'currency',currency:preferences.currency}).resolvedOptions().maximumFractionDigits,maximumFractionDigits:new Intl.NumberFormat('en',{style:'currency',currency:preferences.currency}).resolvedOptions().maximumFractionDigits})}`;
-const daysUntil=date=>Math.round((Date.parse(date+'T00:00:00Z')-Date.parse(today()+'T00:00:00Z'))/86400000);const id=()=>crypto.randomUUID?.()||String(Date.now()+Math.random());const logo=name=>Object.hasOwn(icons,name)&&icons[name]?`https://cdn.simpleicons.org/${icons[name]}`:null;const logoMarkup=(name,url)=>SumiData.safeLogo(url)?`<img class="logo" src="${esc(url)}" alt="" data-fallback="${esc((name||'?').slice(0,1))}">`:`<div class="logo fallback">${esc((name||'?').slice(0,1))}</div>`;const nav=[['home','home','首页'],['list','list','订阅列表'],['stats','stats','统计'],['calendar','calendar','日历'],['settings','settings','设置']];
+const daysUntil=date=>Math.round((Date.parse(date+'T00:00:00Z')-Date.parse(today()+'T00:00:00Z'))/86400000);const id=()=>crypto.randomUUID?.()||String(Date.now()+Math.random());const nav=[['home','home','首页'],['list','list','订阅列表'],['stats','stats','统计'],['calendar','calendar','日历'],['settings','settings','设置']];
 function render(){document.body.classList.toggle('dark',preferences.theme==='dark');$('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand">sumi</div><nav class="nav" aria-label="主导航">${nav.map(([k,i,t])=>`<button class="${view===k?'active':''} ${k==='settings'?'settings-link':''}" data-nav="${k}"><span class="symbol">${sumiIcon(i)}</span>${t}</button>`).join('')}</nav></aside><main class="main view-${view}">${storage.issues.length?`<div class="storage-notice" role="alert">${storage.issues.map(esc).join(" ")} <button class="linkbtn" id="exportRaw">导出原始数据</button></div>`:""}<header class="top"><div><h1>${{home:'首页',list:'订阅列表',stats:'统计',calendar:'日历',settings:'设置'}[view]}</h1><p class="sub">${{home:'轻松管理每一份订阅',list:'你的所有订阅，一目了然',stats:'了解你的订阅支出',calendar:'查看即将到来的续费',settings:'个性化你的 sumi'}[view]}</p></div>${view!=='settings'?`<button class="primary" data-add>${sumiIcon('plus')}添加订阅</button>`:''}</header>${({home:homePage,list:listPage,stats:statsPage,calendar:calendarPage,settings:settingsPage})[view]()}</main></div>${modal?modalHtml():''}${detailId?detailHtml():''}${picker?pickerHtml():''}${paymentModal?paymentHtml():''}`;bind()};const metrics=()=>{let a=data.subscriptions.filter(active),next=[...a].filter(s=>s.nextDate).sort((x,y)=>x.nextDate.localeCompare(y.nextDate))[0];return `<div class="cards ${view==='home'?'home-metrics':''}"><div class="card"><div class="card-title">平均每月订阅成本</div><div class="metric">${moneyDisplay(total())}</div><div class="small">按订阅周期分摊 · 参考汇率</div></div><div class="card"><div class="card-title">正在订阅</div><div class="metric">${a.length} <span style="font-size:15px;color:#91a0b4">项</span></div><div class="small">仅包含有效订阅</div></div><div class="card"><div class="card-title">下次续费</div><div class="metric" style="font-size:24px">${next?esc(next.nextDate):'暂无'}</div><div class="small">${next?esc(next.name):'添加订阅以开始'}</div></div></div>`};function reminders(){let list=data.subscriptions.filter(s=>active(s)&&daysUntil(s.nextDate)<=Number(preferences.reminder)).sort((a,b)=>a.nextDate.localeCompare(b.nextDate));return list.length?`<div class="reminders"><div style="font-weight:650;margin-bottom:8px">${sumiIcon('bell')}续费提醒 <span class="pill">${list.length} 项待关注</span></div>${list.map(s=>`<div class="reminder-item"><div><strong style="font-size:13px">${esc(s.name)}</strong><div class="notice">${daysUntil(s.nextDate)<0?'已过续费日 · 待确认':daysUntil(s.nextDate)===0?'今天续费':daysUntil(s.nextDate)+' 天后续费'} · ${esc(original(s.amount,s.currency))}</div></div><button class="secondary" data-detail="${esc(s.id)}">查看</button></div>`).join('')}</div>`:''}
 function table(){let list=data.subscriptions.filter(s=>(statusFilter==='all'||(statusFilter==='active'?active(s):!active(s)))&&s.name.toLowerCase().includes(filter.toLowerCase()));return `<div class="card section ${view==='home'?'home-table':''}"><div class="section-title"><h2>我的订阅</h2><div class="tools"><input class="search" id="search" value="${esc(filter)}" placeholder="搜索订阅..."/><select class="select" id="statusFilter"><option value="all" ${statusFilter==='all'?'selected':''}>全部订阅</option><option value="active" ${statusFilter==='active'?'selected':''}>订阅中</option><option value="cancelled" ${statusFilter==='cancelled'?'selected':''}>已取消</option></select></div></div><div class="table-wrap"><table class="table"><thead><tr><th>订阅服务</th><th>费用</th><th>平均月成本</th><th>下次续费</th><th>状态</th></tr></thead><tbody>${list.map(s=>`<tr data-detail="${esc(s.id)}"><td><div class="service">${logoMarkup(s.name,s.logo)}${esc(s.name)}</div></td><td>${esc(original(s.amount,s.currency))} / ${esc(s.months)}月</td><td>${moneyDisplay(monthly(s))}</td><td>${esc(s.nextDate)}</td><td><span class="tag ${active(s)?'':'off'}">${active(s)?'订阅中':'已取消'}</span></td></tr>`).join('')}</tbody></table>${!list.length?'<div class="empty">暂无订阅，点击右上角「添加订阅」开始吧</div>':''}</div></div>`}const homePage=()=>metrics()+mobileSummary()+`<div class="section home-reminders">${reminders()}</div>`+chart()+table()+mobileSubscriptions();const listPage=()=>table();function calendarPage(){let d=new Date();d.setDate(1);d.setMonth(d.getMonth()+calOffset);const y=d.getFullYear(),m=d.getMonth(),first=(new Date(y,m,1).getDay()+6)%7,days=new Date(y,m+1,0).getDate();let cells=Array.from({length:first},()=>'<div></div>');for(let day=1;day<=days;day++){let date=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`,items=data.subscriptions.filter(s=>active(s)&&s.nextDate===date);cells.push(`<div class="calendar-cell"><b>${day}</b>${items.map(s=>`<button class="calendar-event" data-detail="${esc(s.id)}">${esc(s.name)}</button>`).join('')}</div>`)}return `<div class="card"><div class="section-title"><h2>${y} 年 ${m+1} 月</h2><div class="month-switch"><button class="secondary" data-month="-1" aria-label="上一月">${sumiIcon('chevron-left')}</button><button class="secondary" data-month="1" aria-label="下一月">${sumiIcon('chevron-right')}</button></div></div><div class="calendar-grid">${['一','二','三','四','五','六','日'].map(x=>`<div class="small" style="text-align:center">周${x}</div>`).join('')}${cells.join('')}</div><p class="note">日历目前展示记录中的下一次续费日期。</p></div>`}
 function settingsPage(){return `<div class="card"><div class="settings-row"><label for="language">语言</label><select class="select" id="language"><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文（待完善）</option><option value="ja">日本語（待完善）</option><option value="en">English（待完善）</option></select></div><div class="settings-row"><label for="currency">统计展示币种</label><select class="select" id="currency">${currencyOptions(preferences.currency)}</select></div>${fxPanel()}<div class="settings-row"><label for="theme">暗黑模式</label><select class="select" id="theme"><option value="light" ${preferences.theme==='light'?'selected':''}>关闭</option><option value="dark" ${preferences.theme==='dark'?'selected':''}>开启</option></select></div><div class="settings-row"><label for="reminder">续费提醒（仅站内）</label><select class="select" id="reminder">${[0,1,3,7,14].map(x=>`<option value="${x}" ${Number(preferences.reminder)===x?'selected':''}>${x?'提前 '+x+' 天':'当天'}</option>`).join('')}</select></div><div class="settings-row"><label>备份与恢复</label><div class="tools"><button class="secondary" id="export">${storage.issues.length?'导出原始数据':'导出 JSON'}</button><button class="secondary" id="import">导入 JSON</button><input id="importFile" type="file" accept=".json,application/json" hidden></div></div><p class="note">订阅和付款原始金额不会随展示币种修改。数据保存在本浏览器，请定期备份。</p></div>`}
-function modalHtml(){let s=formDraft||(modal==='new'?{name:'',amount:'',currency:'CNY',months:1,nextDate:today(),status:'active',autoRenew:true,logo:''}:data.subscriptions.find(x=>x.id===modal));if(!s)return '';return `<div class="overlay" id="modalOverlay"><div class="modal"><div class="modal-head"><h2>${modal==='new'?'添加订阅':'编辑订阅'}</h2><button class="iconbtn" data-close aria-label="关闭订阅表单">${sumiIcon('close')}</button></div><form id="subscriptionForm"><div class="form-grid"><div><label class="small">软件图标</label><button class="logo-picker" type="button" id="openPicker">${logoMarkup(s.name,s.logo||logo(s.name))}</button></div><div class="field"><label for="name">订阅名称</label><input id="name" required maxlength="70" value="${esc(s.name)}" autocomplete="off"><div id="suggestions"></div></div><div class="field"><label for="formCurrency">原始货币</label><select id="formCurrency">${currencyOptions(s.currency)}</select></div><div class="field" style="grid-column:2"><label for="nextDate">下次续费日期</label><input id="nextDate" type="date" min="0001-01-01" max="9999-12-31" required value="${esc(s.nextDate)}"></div><div class="field"><label for="amount">金额</label><input id="amount" type="number" required min="0" step="0.01" value="${esc(s.amount)}"></div><div class="field" style="grid-column:2"><label for="months">订阅周期</label><select id="months">${[1,3,6,12].map(n=>`<option value="${n}" ${Number(s.months)===n?'selected':''}>${n} 个月</option>`).join('')}</select></div><div class="field"><label for="status">订阅状态</label><select id="status"><option value="active" ${active(s)?'selected':''}>订阅中</option><option value="cancelled" ${!active(s)?'selected':''}>已取消</option></select></div><div class="field" style="grid-column:2"><label for="autoRenew">自动续费</label><select id="autoRenew"><option value="true" ${s.autoRenew?'selected':''}>开启</option><option value="false" ${!s.autoRenew?'selected':''}>关闭</option></select></div></div><div class="field category-field"><label for="category">订阅类别</label><input id="category" maxlength="30" value="${esc(s.category||'未分类')}" list="categoryOptions"><datalist id="categoryOptions">${['未分类','影音娱乐','工作效率','云存储','开发工具','生活服务','其他'].map(value=>`<option value="${value}"></option>`).join('')}</datalist></div><div class="modal-actions"><button class="secondary" type="button" data-close>取消</button><button class="primary" type="submit">${modal==='new'?'添加':'保存修改'}</button></div></form></div></div>`}
+function modalHtml(){let s=formDraft||(modal==='new'?{name:'',amount:'',currency:'CNY',months:1,nextDate:today(),status:'active',autoRenew:true,logo:''}:data.subscriptions.find(x=>x.id===modal));if(!s)return '';return `<div class="overlay" id="modalOverlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="subscriptionTitle"><div class="modal-head"><h2 id="subscriptionTitle">${modal==='new'?'添加订阅':'编辑订阅'}</h2><button class="iconbtn" data-close aria-label="关闭订阅表单">${sumiIcon('close')}</button></div><form id="subscriptionForm"><div class="form-grid"><div><label class="small">软件图标</label><button class="logo-picker" type="button" id="openPicker" aria-label="选择或更换订阅图标">${logoMarkup(s.name,s.logo)}</button></div><div class="field service-autocomplete"><label for="name">订阅名称</label><input id="name" required maxlength="70" value="${esc(s.name)}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-controls="suggestions" aria-expanded="false"><div id="suggestions" class="service-suggestions" role="listbox" aria-label="匹配的订阅服务" hidden></div></div><div class="field"><label for="formCurrency">原始货币</label><select id="formCurrency">${currencyOptions(s.currency)}</select></div><div class="field" style="grid-column:2"><label for="nextDate">下次续费日期</label><input id="nextDate" type="date" min="0001-01-01" max="9999-12-31" required value="${esc(s.nextDate)}"></div><div class="field"><label for="amount">金额</label><input id="amount" type="number" required min="0" step="0.01" value="${esc(s.amount)}"></div><div class="field" style="grid-column:2"><label for="months">订阅周期</label><select id="months">${[1,3,6,12].map(n=>`<option value="${n}" ${Number(s.months)===n?'selected':''}>${n} 个月</option>`).join('')}</select></div><div class="field"><label for="status">订阅状态</label><select id="status"><option value="active" ${active(s)?'selected':''}>订阅中</option><option value="cancelled" ${!active(s)?'selected':''}>已取消</option></select></div><div class="field" style="grid-column:2"><label for="autoRenew">自动续费</label><select id="autoRenew"><option value="true" ${s.autoRenew?'selected':''}>开启</option><option value="false" ${!s.autoRenew?'selected':''}>关闭</option></select></div></div><div class="field category-field"><label for="category">订阅类别</label><input id="category" maxlength="30" value="${esc(s.category||'未分类')}" list="categoryOptions"><datalist id="categoryOptions">${['未分类','影音娱乐','工作效率','云存储','开发工具','生活服务','其他'].map(value=>`<option value="${value}"></option>`).join('')}</datalist></div><div class="modal-actions"><button class="secondary" type="button" data-close>取消</button><button class="primary" type="submit">${modal==='new'?'添加':'保存修改'}</button></div></form></div></div>`}
 function shortDate(value){return value?`${Number(value.slice(5,7))}月${Number(value.slice(8,10))}日`:'暂无'}
 function mobileSummary(){
   const subscriptions=data.subscriptions.filter(active),next=[...subscriptions].sort((a,b)=>a.nextDate.localeCompare(b.nextDate))[0];
@@ -64,18 +64,120 @@ function paymentHtml(){
   return `<div class="overlay payment-overlay" id="paymentOverlay"><div class="modal payment-modal" role="dialog" aria-modal="true" aria-labelledby="paymentTitle"><div class="modal-head"><h2 id="paymentTitle">${old?'编辑付款记录':'补录付款'}</h2><button class="iconbtn" data-close-payment aria-label="关闭付款表单">${sumiIcon('close')}</button></div><form id="paymentForm"><div class="field"><label for="paymentDate">实际付款日期</label><input id="paymentDate" type="date" required min="0001-01-01" max="${today()}" value="${esc(p.date)}"></div><div class="field"><label for="paymentAmount">付款金额</label><input id="paymentAmount" type="number" required min="0" step="${old?'any':'0.01'}" value="${esc(p.amount)}"></div><div class="field"><label for="paymentCurrency">原始货币</label><select id="paymentCurrency">${currencyOptions(p.currency)}</select></div><div class="field"><label for="paymentCycleDate">对应账期（可选）</label><input id="paymentCycleDate" type="date" min="0001-01-01" max="9999-12-31" value="${esc(p.cycleDate||'')}"></div><div class="field"><label for="paymentStatus">付款结果</label><select id="paymentStatus"><option value="succeeded" ${SumiBilling.successful(p)?'selected':''}>付款成功</option><option value="failed" ${p.status==='failed'?'selected':''}>付款失败</option></select></div><p class="note">${old?.scheduleArchived?'这条记录属于旧账期设置，保持原账期时不会影响当前续费日；修改对应账期可关联当前设置。':''}关联账期后，成功付款会推进至下一未付款账期。留空则仅补记历史，不推算账期。失败记录不计入实际付款。</p><div class="modal-actions"><button class="secondary" type="button" data-close-payment>取消</button><button class="primary" type="submit">保存付款记录</button></div></form></div></div>`;
 }
 
-function pickerHtml(){let arr=services.filter(s=>s.toLowerCase().includes(pickerSearch.toLowerCase()));return `<div class="overlay" id="pickerOverlay" style="z-index:20"><div class="modal" style="max-width:460px"><div class="modal-head"><h2>选择图标</h2><button class="iconbtn" id="closePicker" aria-label="关闭图标选择">${sumiIcon('close')}</button></div><input class="search" id="pickerSearch" placeholder="搜索 ChatGPT、Netflix、Spotify..." value="${esc(pickerSearch)}" style="width:100%;margin-bottom:20px"><div class="small" style="margin-bottom:12px">常用服务</div><div class="picker-grid">${arr.map(s=>`<button class="pick-item" data-pick="${esc(s)}">${logoMarkup(s,logo(s))}<span>${esc(s)}</span></button>`).join('')}</div><div style="margin-top:20px"><label class="secondary" style="display:block;text-align:center;cursor:pointer">${sumiIcon('upload')}上传自己的图片<input id="uploadLogo" type="file" accept="image/png,image/jpeg,image/webp" hidden></label></div><p class="note">品牌图标从公开 CDN 加载，可能因网络或图标缺失而显示首字占位；未来需完善品牌授权和离线资源。</p></div></div>`}
+function neutralLogo(name){return `<span class="logo fallback" role="img" aria-label="${esc(name?name+'：暂无图标':'暂无图标')}">${sumiIcon('image')}</span>`}
+function resolvedLogo(url){
+  const local=SumiCatalog.all.find(service=>service.logo&&service.legacyUrls?.includes(url));
+  return local?.logo||url;
+}
+function logoMarkup(name,url){
+  const source=resolvedLogo(url);
+  return SumiData.safeLogo(source)?`<img class="logo" src="${esc(source)}" alt="${esc(name||'订阅')} Logo" decoding="async" referrerpolicy="no-referrer" data-logo-image data-logo-name="${esc(name||'')}">`:neutralLogo(name);
+}
+function statisticsLogo(name,subscriptionId){
+  const subscription=data.subscriptions.find(item=>item.id===subscriptionId);
+  return logoMarkup(name,subscription?subscription.logo:SumiCatalog.findExact(name)?.logo);
+}
+function closeSuggestions(){
+  suggestionsOpen=false;suggestionIndex=-1;suggestionResults=[];
+  const list=$('#suggestions'),input=$('#name');
+  if(list){list.hidden=true;list.innerHTML=''}
+  input?.setAttribute('aria-expanded','false');input?.removeAttribute('aria-activedescendant');
+}
+function chooseService(service){
+  if(!service||!$('#name'))return;
+  uploadGeneration++;selectedLogo=service.logo||'';
+  $('#name').value=service.name;
+  if(!$('#category').value.trim()||$('#category').value==='未分类')$('#category').value=service.category;
+  captureDraft();closeSuggestions();
+  $('#openPicker').innerHTML=logoMarkup(service.name,selectedLogo);bindLogos();
+  $('#name').focus();$('#name').setSelectionRange(service.name.length,service.name.length);
+  closeSuggestions();
+}
+function updateSuggestions(reset=true){
+  const input=$('#name'),list=$('#suggestions');if(!input||!list||picker)return;
+  if(nameComposing||!input.value.trim()){closeSuggestions();return}
+  suggestionResults=SumiCatalog.search(input.value,{limit:6});suggestionsOpen=true;
+  if(reset)suggestionIndex=-1;
+  suggestionIndex=Math.min(suggestionIndex,suggestionResults.length-1);
+  list.hidden=false;input.setAttribute('aria-expanded','true');
+  list.innerHTML=suggestionResults.length?suggestionResults.map((service,index)=>`<button type="button" role="option" tabindex="-1" id="service-option-${esc(service.id)}" aria-selected="${index===suggestionIndex}" class="service-suggestion ${index===suggestionIndex?'is-active':''}" data-suggest="${esc(service.id)}">${logoMarkup(service.name,service.logo)}<span class="suggestion-copy"><strong>${esc(service.name)}</strong><span class="small">${esc(service.category)}</span></span></button>`).join(''):'<p class="suggestion-empty" role="status">未找到匹配服务，可直接使用自定义名称。</p>';
+  if(suggestionIndex>=0)input.setAttribute('aria-activedescendant','service-option-'+suggestionResults[suggestionIndex].id);else input.removeAttribute('aria-activedescendant');
+  list.querySelectorAll('[data-suggest]').forEach(button=>{
+    button.addEventListener('pointerdown',event=>{if(event.pointerType==='mouse')event.preventDefault()});
+    button.onclick=()=>chooseService(SumiCatalog.get(button.dataset.suggest));
+  });
+  bindLogos();
+}
+function bindServiceSearch(){
+  const input=$('#name');if(!input)return;
+  input.addEventListener('compositionstart',()=>{nameComposing=true;closeSuggestions()});
+  input.addEventListener('compositionend',()=>{nameComposing=false;captureDraft();updateSuggestions();if(fxRenderPending)setTimeout(()=>{if(fxRenderPending)refreshFxView()},0)});
+  input.addEventListener('input',event=>{if(!event.isComposing&&!nameComposing)updateSuggestions()});
+  input.addEventListener('focus',()=>{if(!nameComposing)updateSuggestions(false)});
+  input.addEventListener('keydown',event=>{
+    if(event.isComposing||nameComposing)return;
+    if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+      event.preventDefault();if(!suggestionsOpen)updateSuggestions();
+      if(!suggestionResults.length)return;
+      suggestionIndex=(suggestionIndex+(event.key==='ArrowDown'?1:suggestionIndex<0?0:-1)+suggestionResults.length)%suggestionResults.length;
+      updateSuggestions(false);$('#service-option-'+suggestionResults[suggestionIndex].id)?.scrollIntoView({block:'nearest'});
+    }else if(event.key==='Enter'&&suggestionsOpen&&suggestionIndex>=0){event.preventDefault();chooseService(suggestionResults[suggestionIndex])}
+    else if(event.key==='Escape'&&suggestionsOpen){event.preventDefault();event.stopPropagation();closeSuggestions()}
+    else if(event.key==='Tab')closeSuggestions();
+  });
+  // Collapse an in-flow panel only after the pointer gesture has activated its target.
+  $('#subscriptionForm').addEventListener('click',event=>{if(!event.target.closest('.service-autocomplete'))closeSuggestions()});
+  if(suggestionsOpen)updateSuggestions(false);
+}
+function pickerResultsHtml(){
+  const list=SumiCatalog.search(pickerSearch,{limit:80});
+  return list.length?list.map(service=>`<button type="button" class="pick-item" data-pick="${esc(service.id)}" aria-label="选择 ${esc(service.name)} 图标">${logoMarkup(service.name,service.logo)}<span>${esc(service.name)}</span><span class="small">${esc(service.category)}</span></button>`).join(''):'<p class="picker-empty small">没有匹配的服务，可上传自己的图片或保留中性图标。</p>';
+}
+function pickerHtml(){return `<div class="overlay" id="pickerOverlay"><div class="modal logo-modal" role="dialog" aria-modal="true" aria-labelledby="pickerTitle"><div class="modal-head"><h2 id="pickerTitle">选择图标</h2><button type="button" class="iconbtn" id="closePicker" aria-label="关闭图标选择">${sumiIcon('close')}</button></div><div class="picker-current">${logoMarkup(formDraft?.name,selectedLogo)}<div><strong>当前图标</strong><p class="small">${selectedLogo?'可替换或移除':'尚未选择图标'}</p></div></div><label class="small" for="pickerSearch">搜索服务图标</label><input class="search" id="pickerSearch" placeholder="搜索中文、英文或常见别名" value="${esc(pickerSearch)}" autocomplete="off"><div class="picker-grid" id="pickerResults">${pickerResultsHtml()}</div><div class="logo-actions"><button type="button" class="secondary" id="chooseUpload">${sumiIcon('upload')}${selectedLogo?'替换为自定义图片':'上传自己的图片'}</button><button type="button" class="secondary" id="removeLogo" ${selectedLogo?'':'disabled'}>${sumiIcon('trash')}移除图标</button><input id="uploadLogo" type="file" accept="image/png,image/jpeg,image/webp" hidden></div><p id="logoUploadStatus" class="logo-upload-status small" role="status">${logoUploading?'正在检查图片…':''}</p><p id="logoError" class="logo-error" role="alert" ${logoError?'':'hidden'}>${esc(logoError)}</p><p class="note">支持静态 PNG、JPEG、WebP，最大 500 KB，单边不超过 4096 像素。没有可靠品牌图标时使用统一中性图标。</p></div></div>`}
+function resetPickerState(){uploadGeneration++;logoUploading=false;logoError='';pickerComposing=false}
+function closePicker(){resetPickerState();picker=false;render();$('#openPicker')?.focus()}
+function bindPickerChoices(){
+  document.querySelectorAll('[data-pick]').forEach(button=>button.onclick=()=>{
+    const service=SumiCatalog.get(button.dataset.pick);if(!service)return;
+    resetPickerState();selectedLogo=service.logo||'';formDraft.logo=selectedLogo;
+    if(!formDraft.name.trim()){formDraft.name=service.name;if(!formDraft.category||formDraft.category==='未分类')formDraft.category=service.category}
+    picker=false;render();$('#openPicker')?.focus();
+  });
+}
+function pickerFeedback(){
+  if($('#logoUploadStatus'))$('#logoUploadStatus').textContent=logoUploading?'正在检查图片…':'';
+  const error=$('#logoError');if(error){error.textContent=logoError;error.hidden=!logoError}
+}
+function bindDialogKeys(element,close){
+  if(!element)return;
+  element.addEventListener('keydown',event=>{
+    if(event.defaultPrevented||event.isComposing||nameComposing||pickerComposing)return;
+    if(event.key==='Escape'){event.preventDefault();close();return}
+    if(event.key!=='Tab')return;
+    const controls=[...element.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex="0"]')].filter(control=>control.tabIndex>=0&&control.getClientRects().length);
+    const first=controls[0],last=controls.at(-1);
+    if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}
+    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus()}
+  });
+}
+
 const commonCurrencies=['CNY','USD','JPY','HKD','TWD','EUR','GBP','KRW'];
 let fxState={snapshot:null,currencies:{},loading:false,error:null,cacheWarning:null,cacheState:'empty'};
 const fxManager=SumiFx.createManager({storage:{getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)},onChange:state=>{
-  fxState=state;if(!uiReady)return;
+  fxState=state;refreshFxView();
+}});
+function refreshFxView(){
+  if(!uiReady)return;
+  // Preserve the active native IME input until composition has committed.
+  if(nameComposing||pickerComposing){fxRenderPending=true;return}
+  fxRenderPending=false;
   captureDraft();capturePaymentDraft();captureStatsFilters();
   const focused=document.activeElement,focusId=focused?.id,position=focused?.selectionStart,scroll=window.scrollY;
   render();
   const restored=focusId?document.getElementById(focusId):null;
   if(restored){restored.focus({preventScroll:true});if(typeof position==='number')try{restored.setSelectionRange(position,position)}catch{}}
   window.scrollTo(0,scroll);
-}});
+}
 fxState=fxManager.getState();
 function currencyOptions(selected){
   const codes=[...new Set([...commonCurrencies,...Object.keys(fxState.currencies||{}),...data.subscriptions.map(s=>s.currency),...data.payments.map(p=>p.currency),preferences.currency,selected])].filter(code=>/^[A-Z]{3}$/.test(code));
@@ -105,7 +207,7 @@ function statsPage(){
   const tracked=new Set((data.costHistory||[]).map(record=>record.subscriptionId));
   const needsBaseline=data.subscriptions.some(subscription=>!tracked.has(subscription.id));
   const baseline=needsBaseline?'<div class="card section"><p class="note">部分旧订阅尚未保存成本历史。当前观察只代表今天；记录基线后可持续跟踪，不补造过去的数据。</p><button class="secondary" id="startCostHistory">记录当前成本基线</button></div>':'';
-  return sumiStatisticsView(model,statsFilters,{esc,money:moneyDisplay,original,icon:sumiIcon})+baseline;
+  return sumiStatisticsView(model,statsFilters,{esc,money:moneyDisplay,original,icon:sumiIcon,logo:statisticsLogo})+baseline;
 }
 function chart(){
   const d=new Date(today()+'T12:00:00Z');d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-5);
@@ -149,8 +251,9 @@ function captureDraft(){
     autoRenew:$('#autoRenew').value==='true',logo:selectedLogo,category:$('#category').value.trim()||'未分类'};
 }
 function bindLogos(){
-  document.querySelectorAll('img[data-fallback]').forEach(img=>{
-    const fallback=()=>{const el=document.createElement('div');el.className='logo fallback';el.textContent=img.dataset.fallback;img.replaceWith(el)};
+  document.querySelectorAll('img[data-logo-image]').forEach(img=>{
+    if(img.dataset.logoBound)return;img.dataset.logoBound='true';
+    const fallback=()=>{const el=document.createElement('span');el.className='logo fallback';el.setAttribute('role','img');el.setAttribute('aria-label',(img.dataset.logoName?img.dataset.logoName+'：':'')+'暂无图标');el.innerHTML=sumiIcon('image');img.replaceWith(el)};
     img.addEventListener('error',fallback,{once:true});
     if(img.complete&&!img.naturalWidth)fallback();
   });
@@ -173,21 +276,21 @@ function bind(){
   $('[data-show-subscriptions]')?.addEventListener('click',()=>{view='list';filter='';render()});
   $('#exportRaw')?.addEventListener('click',()=>downloadJson(storage.rawBackup(),`sumi-recovery-${today()}.json`));
   document.querySelectorAll('[data-nav]').forEach(el=>el.onclick=()=>{view=el.dataset.nav;filter='';render()});
-  document.querySelectorAll('[data-add]').forEach(el=>el.onclick=()=>{uploadGeneration++;modal='new';formDraft=null;selectedLogo='';render()});
+  document.querySelectorAll('[data-add]').forEach(el=>el.onclick=()=>{resetPickerState();closeSuggestions();modal='new';formDraft=null;selectedLogo='';render();$('#name')?.focus()});
   document.querySelectorAll('[data-detail]').forEach(el=>el.onclick=()=>{detailId=el.dataset.detail;render()});
   $('#search')?.addEventListener('input',e=>{filter=e.target.value;const pos=e.target.selectionStart;render();$('#search')?.focus();$('#search')?.setSelectionRange(pos,pos)});
   $('#statusFilter')?.addEventListener('change',e=>{statusFilter=e.target.value;render()});
-  const closeModal=()=>{uploadGeneration++;modal=null;picker=false;formDraft=null;selectedLogo='';render()};
+  const closeModal=()=>{resetPickerState();closeSuggestions();nameComposing=false;modal=null;picker=false;formDraft=null;selectedLogo='';render()};
   document.querySelectorAll('[data-close]').forEach(el=>el.onclick=closeModal);
   $('#modalOverlay')?.addEventListener('click',e=>{if(e.target.id==='modalOverlay')closeModal()});
-  $('#openPicker')?.addEventListener('click',()=>{captureDraft();picker=true;pickerSearch='';render()});
+  $('#openPicker')?.addEventListener('click',()=>{captureDraft();closeSuggestions();resetPickerState();picker=true;pickerSearch='';render();$('#pickerSearch')?.focus()});
   $('#subscriptionForm')?.addEventListener('input',captureDraft);
   $('#subscriptionForm')?.addEventListener('change',captureDraft);
   $('#subscriptionForm')?.addEventListener('submit',e=>{
     e.preventDefault();captureDraft();
     if(!SumiData.formAmount(formDraft.amount)){alert('请输入有效金额，最多保留两位小数。');return}
     const old=modal==='new'?null:data.subscriptions.find(s=>s.id===modal);
-    let s={...old,...formDraft,id:old?.id||id(),name:formDraft.name.trim(),amount:Number(formDraft.amount),logo:selectedLogo||logo(formDraft.name.trim())||''};
+    let s={...old,...formDraft,id:old?.id||id(),name:formDraft.name.trim(),amount:Number(formDraft.amount),logo:selectedLogo};
     const changedSchedule=old&&(old.nextDate!==s.nextDate||old.months!==s.months);
     if(!old||changedSchedule)s.billingAnchor=s.nextDate;
     try{s=SumiData.subscription(s)}catch(error){alert(error.message);return}
@@ -198,35 +301,33 @@ function bind(){
     }))return;
     modal=null;formDraft=null;selectedLogo='';render();
   });
-  $('#name')?.addEventListener('input',e=>{
-    const q=e.target.value.toLowerCase();
-    $('#suggestions').innerHTML=q?services.filter(s=>s.toLowerCase().includes(q)).slice(0,3).map(s=>`<button type="button" class="linkbtn" data-suggest="${esc(s)}">${esc(s)}</button>`).join(''):'';
-    document.querySelectorAll('[data-suggest]').forEach(b=>b.onclick=()=>{
-      $('#name').value=b.dataset.suggest;selectedLogo=logo(b.dataset.suggest)||'';captureDraft();
-      $('#suggestions').innerHTML='';$('#openPicker').innerHTML=logoMarkup(b.dataset.suggest,selectedLogo);bindLogos();
-    });
-  });
-  $('#closePicker')?.addEventListener('click',()=>{uploadGeneration++;picker=false;render()});
-  $('#pickerSearch')?.addEventListener('input',e=>{pickerSearch=e.target.value;const pos=e.target.selectionStart;render();$('#pickerSearch')?.focus();$('#pickerSearch')?.setSelectionRange(pos,pos)});
-  document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{
-    uploadGeneration++;selectedLogo=logo(b.dataset.pick)||'';formDraft.name=b.dataset.pick;formDraft.logo=selectedLogo;picker=false;render();
-  });
-  $('#uploadLogo')?.addEventListener('change',e=>{
-    const f=e.target.files?.[0];if(!f)return;
-    if(!['image/png','image/jpeg','image/webp'].includes(f.type)||f.size>500000){alert('请选择小于 500KB 的 PNG、JPEG 或 WebP 图片。');return}
-    const reader=new FileReader(),generation=++uploadGeneration,targetModal=modal;
+  bindServiceSearch();
+  bindDialogKeys($('#modalOverlay .modal'),closeModal);
+  $('#closePicker')?.addEventListener('click',closePicker);
+  $('#pickerOverlay')?.addEventListener('click',event=>{if(event.target.id==='pickerOverlay')closePicker()});
+  bindDialogKeys($('#pickerOverlay .modal'),closePicker);
+  const updatePickerSearch=()=>{$('#pickerResults').innerHTML=pickerResultsHtml();bindPickerChoices();bindLogos()};
+  $('#pickerSearch')?.addEventListener('compositionstart',()=>{pickerComposing=true});
+  $('#pickerSearch')?.addEventListener('compositionend',event=>{pickerComposing=false;pickerSearch=event.target.value;updatePickerSearch();if(fxRenderPending)setTimeout(()=>{if(fxRenderPending)refreshFxView()},0)});
+  $('#pickerSearch')?.addEventListener('input',event=>{pickerSearch=event.target.value;if(!event.isComposing&&!pickerComposing)updatePickerSearch()});
+  $('#pickerSearch')?.addEventListener('keydown',event=>{if(event.key==='ArrowDown'&&!event.isComposing&&!pickerComposing){event.preventDefault();$('[data-pick]')?.focus()}});
+  bindPickerChoices();
+  $('#chooseUpload')?.addEventListener('click',()=>$('#uploadLogo')?.click());
+  $('#removeLogo')?.addEventListener('click',()=>{resetPickerState();selectedLogo='';formDraft.logo='';picker=false;render();$('#openPicker')?.focus()});
+  $('#uploadLogo')?.addEventListener('change',async event=>{
+    const file=event.target.files?.[0];if(!file)return;
+    const generation=++uploadGeneration,targetModal=modal;
     const pending=()=>generation===uploadGeneration&&modal===targetModal&&picker&&formDraft;
-    reader.onerror=()=>{if(pending())alert('图片读取失败，请重试。')};
-    reader.onload=()=>{
+    logoUploading=true;logoError='';pickerFeedback();
+    try{
+      const result=await SumiLogoUpload.read(file);
       if(!pending())return;
-      const img=new Image();img.onerror=()=>{if(pending())alert('无法读取这张图片，请选择有效的图片文件。')};
-      img.onload=()=>{if(!pending())return;selectedLogo=reader.result;formDraft.logo=selectedLogo;picker=false;render()};img.src=reader.result;
-    };
-    reader.readAsDataURL(f);
+      logoUploading=false;selectedLogo=result;formDraft.logo=result;picker=false;render();$('#openPicker')?.focus();
+    }catch(error){if(pending()){logoUploading=false;logoError=error.message||'图片读取失败，请重试。';if($('#uploadLogo'))$('#uploadLogo').value='';pickerFeedback()}}
   });
   $('#drawerOverlay')?.addEventListener('click',e=>{if(e.target.id==='drawerOverlay'){detailId=null;render()}});
   document.querySelectorAll('[data-close-detail]').forEach(b=>b.onclick=()=>{detailId=null;render()});
-  $('[data-edit]')?.addEventListener('click',()=>{uploadGeneration++;modal=detailId;detailId=null;formDraft=null;selectedLogo=data.subscriptions.find(s=>s.id===modal)?.logo||'';render()});
+  $('[data-edit]')?.addEventListener('click',()=>{resetPickerState();closeSuggestions();modal=detailId;detailId=null;formDraft=null;selectedLogo=data.subscriptions.find(s=>s.id===modal)?.logo||'';render()});
   $('[data-toggle]')?.addEventListener('click',()=>{const current=data.subscriptions.find(s=>s.id===detailId);if(!confirm(active(current)?'标记为已取消？付款历史和原账期会保留。':'恢复订阅？原账期会保留，逾期付款需逐期确认。'))return;if(updateData(next=>{const s=next.subscriptions.find(x=>x.id===detailId);s.status=active(s)?'cancelled':'active'}))render()});
   $('[data-delete]')?.addEventListener('click',()=>{
     if(confirm('删除此订阅及其付款记录？此操作不可撤销。')&&updateData(next=>{

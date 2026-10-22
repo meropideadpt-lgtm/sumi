@@ -75,6 +75,7 @@ const SumiData = (() => {
   const safeLogo = value => {
     if (!value) return '';
     if (typeof value !== 'string') return '';
+    if (/^assets\/brands\/[a-z0-9]+(?:-[a-z0-9]+)*\.svg$/.test(value)) return value;
     if (/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value)) return value;
     try {
       const url = new URL(value);
