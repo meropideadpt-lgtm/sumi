@@ -1,0 +1,31 @@
+name: Static app checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tests/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python -m pip install -r tests/requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: node --check app.js && node --check data-store.js
+      - run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Capture layouts for review
+        run: python tests/visual.py --capture tests/artifacts/ci-visual
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-layouts
+          path: tests/artifacts/
