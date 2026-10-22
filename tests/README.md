@@ -11,6 +11,9 @@ python -m pip install -r tests/requirements.txt
 python -m playwright install chromium
 node --check app.js
 node --check data-store.js
+node --check billing.js
+node --check icons.js
+node --test tests/test_*.cjs
 python -m unittest discover -s tests -p 'test_*.py' -v
 python tests/visual.py
 ```
@@ -21,7 +24,7 @@ python tests/visual.py
 
 ## 视觉检查
 
-`baselines/` 中的 18 张截图覆盖桌面 1440×1000、iPad 尺寸 820×1180、手机 390×844 的五个页面和新增表单。布局测试另覆盖 320×740、1024×768，并检查长名称日历事件不溢出。截图使用固定时区、时间、示例数据和字体环境，阻止外部图标请求，避免网络导致不稳定。
+`baselines/` 中的 25 张截图覆盖桌面 1440×1000、iPad 尺寸 820×1180、手机 390×844 的五个页面、新增订阅表单、订阅详情与付款表单，另有手机重要提醒截图。布局测试另覆盖 320×740、1024×768，并检查长名称日历事件不溢出。截图使用固定时区、时间、示例数据和字体环境，阻止外部图标请求，避免网络导致不稳定。
 
 本次基线生成环境：Debian 13、系统 Chromium 154.0.8037.57、Python 3.12、Playwright 1.62.0、Pillow 12.3.0。操作系统、字体、浏览器版本不同可能产生像素差异。CI 运行交互断言并上传截图供审查；像素比较应在相同渲染环境中执行。当前基线没有暗色模式、真实 Safari 或 iOS/iPadOS 设备覆盖。
 
@@ -31,7 +34,7 @@ python tests/visual.py
 python tests/visual.py --capture tests/baselines
 ```
 
-与初始提交 `2d34abd` 的截图对比：桌面/iPad 页面保留原有布局；手机搜索筛选改为完整一行，设置按钮缩小间距，窄屏表单增加输入宽度。日期默认值改为本地日历日。在设备上仍需补充触摸键盘、Safari 和系统字体验收。
+本阶段以 PR #1 的 `e616919` 为基础：桌面/iPad 页面保留原有布局和完整柱状图，导航统一为本地 SVG 图标。<=720px 手机首页隐藏图表、合并核心摘要、最多列出三条订阅并提供完整列表入口；到期/逾期提醒不截断、不折叠。截图前等待短动画结束，支持系统减少动态效果设置。在设备上仍需补充触摸键盘、Safari 和系统字体验收。
 
 ## 数据保护约定
 
@@ -41,4 +44,8 @@ python tests/visual.py --capture tests/baselines
 
 保存前写入 `sumi-write-journal-v1`，同时记录两个旧存储值；部分失败会回滚，浏览器中断留下的记录会在下次启动恢复。写入成功后才更新页面状态。若存储继续拒绝恢复，保留日志并暂停写入，待存储权限/空间恢复后刷新。日志需要额外容量；接近 localStorage 上限时应导出备份并减少大图片。写入前检测其他标签页的已有更改，但 localStorage 不提供跨标签页数据库事务，严格同时写入的冲突解决仍留待后续数据层设计。
 
-仍保留既有业务限制：月末续费锚点、跨多个逾期周期、补录付款与账期关联、删除付款后的日期调整；本轮没有改变这些规则。固定汇率、参考成本图表和站内提醒也保持原有范围。
+第二阶段账期测试通过 Node 内置测试执行，覆盖 1/3/6/12 月周期、短月与闰年、跨年、原始扣款日、失败状态、去重和提前/乱序付款。浏览器测试保留第一阶段数据保护回归，并新增月底逾期逐期确认、失败重试、快速连击、取消恢复、付款编辑删除、改周期后的旧记录归档及手机首页布局。
+
+新增可选字段为 subscription.billingAnchor、payment.status、payment.advancesSchedule、payment.scheduleArchived；仍使用 version 1 备份和原存储键。旧记录缺少 status 时语义为成功，不在启动时补写。旧补录缺少 cycleDate 时不猜测归属。归档记录保留成功/失败等历史事实，但不会推进新的账期计划；同一日期的成功记录仍参与重复付款保护。
+
+未解决范围：旧版从未保存原始扣款日的信息无法完整重建；实际支付状态仍由用户确认，无支付服务对接。固定汇率、参考成本图表、跨标签页严格并发及真实 Safari/设备验收保持后续范围。

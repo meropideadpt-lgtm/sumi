@@ -285,15 +285,16 @@ class AppTests(unittest.TestCase):
 
     def test_invalid_manual_payment_date_and_amount(self):
         self.add();self.page.locator('tr[data-detail]').click()
-        self.page.remove_listener('dialog',self.dialog)
-        answers=iter(['2026-02-31','2026-02-28',''])
-        def respond(d):
-            self.messages.append(d.message)
-            d.accept(next(answers)) if d.type=='prompt' else d.accept()
-        self.page.on('dialog',respond)
         self.page.locator('[data-payment]').click()
+        # Exercise the JS boundary as well as native input validation.
+        self.page.locator('#paymentDate').evaluate("el=>{el.type='text';el.value='2026-02-31'}")
+        self.page.locator('#paymentAmount').fill('10')
+        self.page.locator('#paymentForm').dispatch_event('submit')
         self.assertEqual(self.store()['payments'],[])
-        self.page.locator('[data-payment]').click()
+        self.assertIn('真实付款日期',self.messages[-1])
+        self.page.locator('#paymentDate').evaluate("el=>{el.type='date';el.value='2026-10-22'}")
+        self.page.locator('#paymentAmount').fill('')
+        self.page.locator('#paymentForm').dispatch_event('submit')
         self.assertEqual(self.store()['payments'],[])
         self.assertIn('有效金额',self.messages[-1])
 
