@@ -83,7 +83,12 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.store()['subscriptions'][0]['amount'], 45.5)
         self.assertEqual(self.store()['subscriptions'][0]['name'], '已编辑')
         self.page.locator('[data-delete]').click()
-        self.assertEqual(self.store(), {'subscriptions':[], 'payments':[]})
+        deleted=self.store()
+        self.assertEqual(deleted['subscriptions'],[])
+        self.assertEqual(deleted['payments'],[])
+        self.assertEqual(deleted['costHistory'][0]['kind'],'created')
+        self.assertEqual(deleted['costHistory'][-1]['status'],'deleted')
+        self.assertEqual(deleted['costHistory'][-1]['amount'],45.5)
 
     def test_renewal_is_persisted_with_payment(self):
         self.add()

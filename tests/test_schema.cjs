@@ -154,3 +154,160 @@ test('archived schedule marker requires a boolean and a detached linked cycle', 
   assert.throws(() => check(backup([missingCycle])), /必须保留日期/);
   assert.equal(check(backup([paid({scheduleArchived:false})])).data.payments[0].scheduleArchived,false);
 });
+
+const revision = overrides => ({id:'revision',subscriptionId:'subscription',name:'阅读会员',category:'影音娱乐',
+  amount:28,currency:'CNY',months:1,status:'active',effectiveDate:'2026-01-31',
+  observedAt:'2026-01-31T04:00:00.000Z',kind:'baseline',...overrides});
+const frozen = overrides => ({version:1,status:'available',provider:'frankfurter',sourceCurrency:'USD',sourceAmount:10,
+  displayCurrency:'CNY',base:'EUR',rate:8/1.1,convertedAmount:72.73,date:'2026-01-30',
+  fetchedAt:'2026-01-31T01:00:00.000Z',confirmedAt:'2026-02-01T02:00:00.000Z',
+  rates:{EUR:1,CNY:8,USD:1.1,JPY:160},reason:null,...overrides});
+
+test('currency syntax accepts API catalog extensions and preserves unsupported legacy originals', () => {
+  for (const currency of ['CNY','USD','JPY','HKD','TWD','EUR','GBP','KRW','AUD','CHF','XYZ']) {
+    const value=backup([paid({currency})],[sub({currency})]);
+    value.preferences={currency};
+    const checked=check(value);
+    assert.equal(checked.data.subscriptions[0].currency,currency);
+    assert.equal(checked.data.payments[0].currency,currency);
+    assert.equal(checked.preferences.currency,currency);
+  }
+  for (const currency of ['usd','US','USDD','<X>',' USD','12A',null,1]) {
+    assert.throws(()=>check(backup([],[sub({currency})])),/币种无效/);
+    assert.throws(()=>check(backup([paid({currency})])),/币种无效/);
+    assert.throws(()=>check({...backup(),preferences:{currency}}),/偏好设置无效/);
+  }
+});
+
+test('subscription categories are optional, bounded text and never auto-added at startup', () => {
+  assert.equal(Object.hasOwn(check(backup()).data.subscriptions[0],'category'),false);
+  assert.equal(check(backup([],[sub({category:'自定义分类'})])).data.subscriptions[0].category,'自定义分类');
+  for (const category of ['', '   ', 'x'.repeat(31),null,42,{}]) {
+    assert.throws(()=>check(backup([],[sub({category})])),/类别无效/);
+  }
+});
+
+test('cost history round-trips all revisions and extensions without rewriting old records', () => {
+  const value=backup([paid()]);
+  value.data.costHistory=[revision({extra:{keep:true}}),revision({id:'changed',kind:'changed',amount:36,effectiveDate:'2026-02-01'}),
+    revision({id:'deleted',kind:'deleted',status:'deleted',effectiveDate:'2026-03-01'})];
+  assert.deepEqual(check(value).data,value.data);
+  const original=JSON.stringify(value.data,null,2), storage=memory({'sumi-data-v1':original});
+  const loaded=api.open(storage);
+  assert.equal(loaded.issues.length,0);
+  assert.equal(storage.getItem('sumi-data-v1'),original);
+  assert.deepEqual(storage.mutations,[]);
+  assert.equal(Object.hasOwn(check(backup()).data,'costHistory'),false);
+});
+
+test('invalid cost history and duplicate IDs are rejected before importing', () => {
+  const invalid=[null,{},'history'];
+  for (const costHistory of invalid) {
+    assert.throws(()=>check({...backup(),data:{...backup().data,costHistory}}),/成本历史必须是数组/);
+  }
+  for (const patch of [{effectiveDate:'2026-02-31'},{observedAt:'2026-02-31T12:00:00Z'},{observedAt:'yesterday'},
+    {months:0},{amount:-1},{currency:'INVALID'},{category:''},{status:'unknown'},{kind:'unknown'},
+    {kind:'deleted',status:'active'}]) {
+    assert.throws(()=>check({...backup(),data:{...backup().data,costHistory:[revision(patch)]}}),/成本历史/);
+  }
+  assert.throws(()=>check({...backup(),data:{...backup().data,costHistory:[revision(),revision()]}}),/编号重复/);
+});
+
+test('corrupt local cost history protects raw bytes while preserving subscriptions and payments for viewing', () => {
+  for (const costHistory of [{broken:true},[revision(),revision({id:'broken',amount:-1})]]) {
+    const value={...backup([paid()]).data,costHistory},original=JSON.stringify(value);
+    const storage=memory({'sumi-data-v1':original}),loaded=api.open(storage);
+    assert.equal(loaded.data.subscriptions.length,1);
+    assert.equal(loaded.data.payments.length,1);
+    assert.equal(loaded.issues.length,1);
+    assert.equal(loaded.rawBackup().raw['sumi-data-v1'],original);
+    assert.throws(()=>loaded.write(loaded.data,loaded.preferences),/暂停写入/);
+    assert.equal(storage.getItem('sumi-data-v1'),original);
+    assert.deepEqual(storage.mutations,[]);
+  }
+});
+
+test('frozen foreign payment snapshots preserve quote matrix and exact confirmed results', () => {
+  const record=paid({amount:10,currency:'USD',fxSnapshot:frozen()});
+  const value=backup([record]);
+  assert.deepEqual(check(value).data.payments[0],record);
+  const original=JSON.stringify(value.data),storage=memory({'sumi-data-v1':original});
+  const loaded=api.open(storage);
+  assert.equal(loaded.issues.length,0);
+  assert.equal(storage.getItem('sumi-data-v1'),original);
+  assert.deepEqual(storage.mutations,[]);
+});
+
+test('frozen payment snapshots reject mismatched originals, rates, converted money and invalid metadata', () => {
+  for (const patch of [{sourceAmount:11},{sourceCurrency:'EUR'},{displayCurrency:'INVALID'},
+    {rate:1},{rate:0},{rate:Infinity},{convertedAmount:10},{convertedAmount:72.731},
+    {convertedAmount:NaN},{confirmedAt:'invalid'},{date:'2026-02-31'},{fetchedAt:null},
+    {rates:{EUR:1,USD:1.1,CNY:0}},{rates:{EUR:2,USD:1.1,CNY:8}},
+    {rates:{EUR:1,USD:1.1}},{provider:'unknown'},{status:'latest'},{base:'INVALID'}]) {
+    assert.throws(()=>check(backup([paid({amount:10,currency:'USD',fxSnapshot:frozen(patch)})])),/汇率|币|付款|换算/);
+  }
+});
+
+test('same currency identity snapshots retain pre-existing fractional originals without invented FX dates', () => {
+  const fx=frozen({provider:'identity',sourceCurrency:'CNY',sourceAmount:3.123,displayCurrency:'CNY',base:'CNY',
+    rate:1,convertedAmount:3.123,date:null,fetchedAt:null,rates:{CNY:1}});
+  const record=paid({amount:3.123,fxSnapshot:fx});
+  assert.deepEqual(check(backup([record])).data.payments[0],record);
+  for (const patch of [{convertedAmount:3.12},{rate:2},{displayCurrency:'USD'},{date:'2026-01-30',fetchedAt:'2026-01-31T01:00:00.000Z'},
+    {rates:{CNY:1,USD:1.1}},{base:'EUR'}]) {
+    assert.throws(()=>check(backup([paid({amount:3.123,fxSnapshot:{...fx,...patch}})])),/币种|快照|金额|矩阵|汇率/);
+  }
+});
+
+test('unavailable FX snapshots retain original money and reasons without a fake conversion', () => {
+  const fx=frozen({status:'unavailable',provider:'unavailable',sourceCurrency:'TWD',sourceAmount:100,
+    rate:null,convertedAmount:null,reason:'参考汇率接口不支持 TWD'});
+  const record=paid({amount:100,currency:'TWD',fxSnapshot:fx});
+  assert.deepEqual(check(backup([record])).data.payments[0],record);
+  for (const patch of [{rate:1},{convertedAmount:100},{reason:''},{provider:'identity'}]) {
+    assert.throws(()=>check(backup([paid({amount:100,currency:'TWD',fxSnapshot:{...fx,...patch}})])),/换算|原因/);
+  }
+});
+
+test('snapshot conversion respects zero minor units and rejects unsafe numerical overflow', () => {
+  const rate=160/1.1;
+  const fx=frozen({displayCurrency:'JPY',rate,convertedAmount:Math.round((10*rate+Number.EPSILON))});
+  assert.equal(check(backup([paid({amount:10,currency:'USD',fxSnapshot:fx})])).data.payments[0].fxSnapshot.convertedAmount,1455);
+  assert.throws(()=>check(backup([paid({amount:10,currency:'USD',fxSnapshot:{...fx,convertedAmount:1454.5}})])),/换算金额/);
+  const huge=Number.MAX_SAFE_INTEGER/100;
+  assert.throws(()=>check(backup([paid({amount:huge,currency:'USD',fxSnapshot:{...fx,sourceAmount:huge,convertedAmount:huge*rate}})])),/换算金额/);
+});
+
+test('exchange freeze and revise outputs satisfy the persisted schema without changing historical source data', () => {
+  const fx=require('../exchange.js');
+  const snapshot={version:1,base:'EUR',date:'2026-01-30',fetchedAt:'2026-01-31T01:00:00.000Z',
+    rates:{EUR:1,CNY:8,USD:1.1,JPY:160},currencies:{EUR:'Euro',CNY:'Yuan',USD:'Dollar',JPY:'Yen'}};
+  const confirmedAt='2026-02-01T02:00:00.000Z';
+  for (const [amount,currency,target,cache] of [[10,'USD','CNY',snapshot],[10,'USD','JPY',snapshot],
+    [3.123,'CNY','CNY',snapshot],[3.123,'CNY','CNY',null],[20,'TWD','TWD',snapshot],
+    [20,'TWD','CNY',snapshot],[20,'USD','CNY',null]]) {
+    const record=paid({amount,currency,fxSnapshot:fx.freeze(amount,currency,target,cache,confirmedAt)});
+    assert.deepEqual(check(backup([record])).data.payments[0],record);
+    const unchanged=fx.revise(record,record.amount,record.currency);
+    assert.deepEqual(unchanged,record.fxSnapshot);
+    const revised={...record,amount:record.amount+1,fxSnapshot:fx.revise(record,record.amount+1,record.currency)};
+    assert.deepEqual(check(backup([revised])).data.payments[0],revised);
+  }
+});
+
+test('frozen metadata chronology rejects future quotes while permitting backdated actual payments', () => {
+  const backdated=paid({date:'2025-01-01',amount:10,currency:'USD',fxSnapshot:frozen()});
+  assert.deepEqual(check(backup([backdated])).data.payments[0],backdated);
+  for (const patch of [
+    {date:'2026-11-01',fetchedAt:'2026-11-02T00:00:00.000Z'},
+    {date:'2026-02-01',fetchedAt:'2026-01-31T23:59:59.000Z'},
+    {date:'2026-02-01',fetchedAt:'2026-02-01T02:05:00.001Z'},
+    {date:'2026-02-02',fetchedAt:'2026-02-01T02:04:00.000Z'}
+  ]) {
+    assert.throws(()=>check(backup([paid({amount:10,currency:'USD',fxSnapshot:frozen(patch)})])),/时间顺序无效/);
+  }
+  const skew=frozen({date:'2026-02-01',fetchedAt:'2026-02-01T02:04:59.000Z'});
+  assert.deepEqual(check(backup([paid({amount:10,currency:'USD',fxSnapshot:skew})])).data.payments[0].fxSnapshot,skew);
+  const midnight=frozen({date:'2026-02-02',fetchedAt:'2026-02-02T00:01:00.000Z',confirmedAt:'2026-02-01T23:59:00.000Z'});
+  assert.deepEqual(check(backup([paid({amount:10,currency:'USD',fxSnapshot:midnight})])).data.payments[0].fxSnapshot,midnight);
+});
