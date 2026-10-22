@@ -1,6 +1,7 @@
 name: Static app checks
 on:
   pull_request:
+  workflow_dispatch:
   push:
     branches: [main]
 permissions:
@@ -30,3 +31,53 @@ jobs:
         with:
           name: browser-layouts
           path: tests/artifacts/
+
+  deploy-pages:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: browser-tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Confirm current main commit
+        id: release
+        run: |
+          current_main="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [ "$current_main" = "$GITHUB_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "A newer main commit exists; skipping this older deployment."
+          fi
+      - name: Build verified static site
+        if: steps.release.outputs.current == 'true'
+        run: python scripts/build-pages.py
+      - name: Configure GitHub Pages
+        if: steps.release.outputs.current == 'true'
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        if: steps.release.outputs.current == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy to GitHub Pages
+        if: steps.release.outputs.current == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Verify published resources
+        if: steps.release.outputs.current == 'true'
+        env:
+          PAGES_URL: ${{ steps.deployment.outputs.page_url }}
+        run: python scripts/verify-pages.py --url "$PAGES_URL" --site _site

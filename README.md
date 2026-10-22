@@ -2,13 +2,19 @@
 
 一个纯白、极淡蓝与深色文字的极简个人订阅管理网站。应用使用静态 HTML、CSS 和 JavaScript，无需构建或安装生产依赖，可部署到 GitHub Pages。
 
-## 部署到 GitHub Pages
+## 网页试用与 GitHub Pages
 
-1. 正式发布前运行 `python scripts/update-pwa-cache.py` 更新静态资源校验清单。发布仓库根目录全部运行时 `.html`、`.css`、`.js`、`manifest.webmanifest`，以及完整的 `locales/`、`assets/`；保留相对路径、品牌来源与许可证文件。必须一次发布相互匹配的文件，不能遗漏 `sw-assets.js`。
-2. 进入仓库 **Settings → Pages → Build and deployment**，Source 选 **Deploy from a branch**，Branch 选正式发布分支，文件夹选 `/(root)`，保存。
-3. 等待 Pages 部署完成，打开 GitHub 显示的网站地址。
+项目是纯静态网页，无需 Node 生产依赖、后端、账号或构建框架，适合 GitHub Pages 的 HTTPS 项目站点。仓库 `meropideadpt-lgtm/sumi` 的默认地址为 `https://meropideadpt-lgtm.github.io/sumi/`；实际是否上线应以 Actions 部署结果及该地址的响应为准。
 
-以上是将来正式发布所需的文件与步骤；第六阶段不部署正式版本。开发阶段的 Draft PR 按依赖关系审查，未经统一验收和明确授权不提前合并到 main。
+自动部署配置在 `.github/workflows/test.yml`：PR 运行检查；推送 main 或在 Actions 手动运行 main 时，先通过语法、Node、浏览器和截图检查，再由独立 `deploy-pages` 任务发布并逐项核对线上资源。部署只使用 GitHub 内置令牌的 `pages: write` 与 `id-token: write`，无需个人令牌。其他分支和 PR 不部署。
+
+首次启用需要进入仓库 **Settings → Pages → Build and deployment → Source**，选择 **GitHub Actions**。如果当前 GitHub 集成无法开启 Pages，需仓库管理员完成这一步。随后在 **Actions → Static app checks → Run workflow → Branch: main → Run workflow** 启动；若同一提交的检查已完成且仅部署任务因未启用 Pages 失败，也可选择 **Re-run failed jobs**。
+
+`scripts/build-pages.py` 校验已提交的 PWA 清单，按精确清单输出 `_site/`：运行时资源、Service Worker、品牌许可与来源文件，以及 `.nojekyll`。不发布整个仓库、测试、备份或本地数据，不在部署时改写应用文件。运行时文件发生变化后先执行 `python scripts/update-pwa-cache.py`，将更新后的 `sw-assets.js` 一起提交；过期清单会阻止发布。
+
+所有页面脚本、CSS、Logo、语言文件和 Manifest 均使用相对路径，PWA 的 scope/start_url 与 Service Worker 缓存以 `/sumi/` 为边界。首次离线使用前，需成功联网打开并等待设置页显示离线资源准备完成。
+
+试用前请保留完整 JSON 备份。新 Pages 网址与旧预览、本地地址的数据按浏览器来源隔离，不会自动迁移；在原网址导出，再到新网址「设置 → 导入 JSON」即可转移订阅、付款和图片。不同设备仍独立保存，没有云同步。详见 [部署与实机试用](docs/pages-deployment.md)。
 
 ## 当前实现
 
