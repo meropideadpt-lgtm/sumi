@@ -6,7 +6,7 @@ from PIL import Image, ImageChops
 from browser_support import Harness, FIXTURE, PREFS, SIZES
 
 ROOT = Path(__file__).resolve().parent
-BASELINE_COUNT = 46
+BASELINE_COUNT = 50
 
 def statistics_history_fixture():
     """Synthetic observed plans and successful payments, never live financial data."""
@@ -101,6 +101,10 @@ def capture(folder):
             assert page.locator('[data-chart=annual] .stats-bar').count()==3
             assert page.locator('.stats-payments .payment').count()==4
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            # Filter updates preserve controls and scroll. Capture a fixed origin
+            # so sticky navigation is not positioned by the preceding pointer action.
+            page.mouse.move(0,0)
+            page.evaluate('window.scrollTo(0,0)')
             page.screenshot(path=folder/f'{name}-stats-history.png',full_page=True,animations='disabled')
             page.context.close()
         for name, size in SIZES.items():
@@ -134,6 +138,7 @@ def capture(folder):
             page.clock.run_for(350)
             page.wait_for_function("Array.from(document.querySelectorAll('img.logo')).every(image=>image.complete&&image.naturalWidth>0)")
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            page.evaluate('window.scrollTo(0,0)')
             page.screenshot(path=folder/filename,full_page=True,animations='disabled')
         def full_statistics(page):
             page.locator('[data-nav=stats]').click()
@@ -141,6 +146,7 @@ def capture(folder):
             page.locator('#statsStart').fill('2024-01-01')
             page.locator('#statsEnd').fill('2026-10-22')
             page.locator('#statsFilters [type=submit]').click()
+            page.mouse.move(0,0)
             assert page.locator('[data-chart=monthly] .stats-bar').count()>12
             assert page.locator('[data-chart=annual] .stats-bar').count()==3
         page=h.page(SIZES['desktop'],appearance_data,dark_prefs)
@@ -170,6 +176,24 @@ def capture(folder):
         page.locator('[data-add]').click()
         capture_appearance(page,'ipad-ja-JP-light-form.png')
         page.context.close()
+
+        # All presets remain visible regardless of the current category text.
+        # These are simulated viewports, not physical iPadOS Safari captures.
+        for device, language, theme in [
+            ('desktop', 'zh-CN', 'light'),
+            ('ipad', 'ja-JP', 'dark'),
+            ('phone', 'en', 'light'),
+            ('phone', 'zh-TW', 'dark'),
+        ]:
+            page=h.page(SIZES[device],FIXTURE,{**PREFS,'language':language,'theme':theme})
+            page.locator('[data-add]').click()
+            page.locator('#categoryToggle').click()
+            page.locator('#categoryOptions').scroll_into_view_if_needed()
+            assert page.locator('#categoryOptions [data-category]').count()==13
+            assert page.locator('#categoryOptions').is_visible()
+            page.mouse.move(0,0)
+            capture_appearance(page,f'{device}-{language}-{theme}-category-picker.png')
+            page.context.close()
 
 def compare(expected, actual):
     failures = []

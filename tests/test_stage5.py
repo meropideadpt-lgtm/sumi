@@ -206,7 +206,7 @@ class StageFiveTests(unittest.TestCase):
         for language in LANGUAGES:
             with self.subTest(language=language):
                 self.language(language)
-                self.navigate('list')
+                self.navigate('home')
                 self.open_form(amount='42.50')
                 self.page.locator('#months').select_option('3')
                 self.page.locator('#formCurrency').select_option('USD')
@@ -228,10 +228,11 @@ class StageFiveTests(unittest.TestCase):
 
     def test_english_subscription_edit_cancel_restore_failure_and_success_are_interactive(self):
         self.language('en')
-        self.navigate('list')
+        self.navigate('home')
         self.open_form('Private subscription 设置','15.25')
         self.page.locator('#category').fill('Music')
         self.submit()
+        self.navigate('list')
         subscription=self.store()['subscriptions'][0]
         sid=subscription['id']
         self.page.locator(f'[data-detail="{sid}"]').click()
@@ -434,7 +435,7 @@ class StageFiveTests(unittest.TestCase):
                                 expect(self.page.locator('.mobile-summary')).to_be_visible()
                             else:
                                 expect(self.page.locator('.home-chart')).to_be_visible()
-                    self.navigate('list')
+                    self.navigate('home')
                     self.open_form('Custom','10')
                     self.page.locator('#openPicker').click()
                     self.page.locator('#pickerSearch').fill('GitHub')
@@ -444,16 +445,14 @@ class StageFiveTests(unittest.TestCase):
                     self.page.locator('#closePicker').click()
                     self.page.locator('#modalOverlay [data-close]').first.click()
 
-    def test_dark_brand_logo_has_readable_tile_and_loads(self):
+    def test_dark_brand_logo_is_a_readable_light_silhouette_and_loads(self):
         self.seed(self.fixture(),{**PREFS,'theme':'dark','language':'en'})
         self.navigate('list')
         logo=self.page.locator('[data-detail=reading] img.logo')
         logo.evaluate('(image)=>image.decode()')
         self.assertTrue(logo.evaluate('(image)=>image.naturalWidth>0'))
-        bg=logo.evaluate('(image)=>getComputedStyle(image).backgroundColor')
-        channels=[int(value) for value in re.findall(r'\d+',bg)[:3]]
-        self.assertEqual(len(channels),3)
-        self.assertGreater(min(channels),220,'Dark-mode brand tile should keep dark brand paths visible')
+        self.assertEqual(logo.evaluate('(image)=>getComputedStyle(image).backgroundColor'),'rgba(0, 0, 0, 0)')
+        self.assertEqual(logo.evaluate('(image)=>getComputedStyle(image).filter'),'brightness(0) invert(1)')
 
     def test_localized_forms_have_labels_focus_and_dialog_keyboard_controls(self):
         self.language('en')

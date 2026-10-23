@@ -3,6 +3,43 @@ const SumiI18n = (() => {
   const LANGUAGES = Object.freeze(['zh-CN','zh-TW','ja-JP','en']);
   const normalize = language => LANGUAGES.includes(language) ? language : 'zh-CN';
   const generic = {'zh-CN':'暂不可用','zh-TW':'暫時無法使用','ja-JP':'現在利用できません',en:'Unavailable'};
+  // Display names are independent of FX support and persisted ISO codes. Keep
+  // the v1 catalogue plus TWD available offline and in older Intl implementations.
+  const currencyNames = {
+    AUD:['澳大利亚元','澳幣','オーストラリアドル','Australian dollar'],
+    BGN:['保加利亚列弗','保加利亞列弗','ブルガリアレフ','Bulgarian lev'],
+    BRL:['巴西雷亚尔','巴西雷亞爾','ブラジルレアル','Brazilian real'],
+    CAD:['加拿大元','加幣','カナダドル','Canadian dollar'],
+    CHF:['瑞士法郎','瑞士法郎','スイスフラン','Swiss franc'],
+    CNY:['人民币','人民幣','人民元','Chinese yuan'],
+    CZK:['捷克克朗','捷克克朗','チェココルナ','Czech koruna'],
+    DKK:['丹麦克朗','丹麥克朗','デンマーククローネ','Danish krone'],
+    EUR:['欧元','歐元','ユーロ','Euro'],
+    GBP:['英镑','英鎊','英ポンド','British pound'],
+    HKD:['港元','港幣','香港ドル','Hong Kong dollar'],
+    HUF:['匈牙利福林','匈牙利福林','ハンガリーフォリント','Hungarian forint'],
+    IDR:['印尼盾','印尼盾','インドネシアルピア','Indonesian rupiah'],
+    ILS:['以色列新谢克尔','以色列新謝克爾','イスラエル新シェケル','Israeli new shekel'],
+    INR:['印度卢比','印度盧比','インドルピー','Indian rupee'],
+    ISK:['冰岛克朗','冰島克朗','アイスランドクローナ','Icelandic króna'],
+    JPY:['日元','日圓','日本円','Japanese yen'],
+    KRW:['韩元','韓元','韓国ウォン','South Korean won'],
+    MXN:['墨西哥比索','墨西哥披索','メキシコペソ','Mexican peso'],
+    MYR:['马来西亚林吉特','馬來西亞令吉','マレーシアリンギット','Malaysian ringgit'],
+    NOK:['挪威克朗','挪威克朗','ノルウェークローネ','Norwegian krone'],
+    NZD:['新西兰元','紐西蘭元','ニュージーランドドル','New Zealand dollar'],
+    PHP:['菲律宾比索','菲律賓披索','フィリピンペソ','Philippine peso'],
+    PLN:['波兰兹罗提','波蘭茲羅提','ポーランドズウォティ','Polish złoty'],
+    RON:['罗马尼亚列伊','羅馬尼亞列伊','ルーマニアレイ','Romanian leu'],
+    SEK:['瑞典克朗','瑞典克朗','スウェーデンクローナ','Swedish krona'],
+    SGD:['新加坡元','新加坡幣','シンガポールドル','Singapore dollar'],
+    THB:['泰铢','泰銖','タイバーツ','Thai baht'],
+    TRY:['土耳其里拉','土耳其里拉','トルコリラ','Turkish lira'],
+    TWD:['新台币','新臺幣','新台湾ドル','New Taiwan dollar'],
+    USD:['美元','美元','米ドル','US dollar'],
+    ZAR:['南非兰特','南非蘭特','南アフリカランド','South African rand']
+  };
+  const unknownCurrency = ['未知货币','未知貨幣','名称不明の通貨','Unknown currency'];
   const categories = {
     '未分类':['未分類','未分類','Uncategorized'],
     '影音娱乐':['影音娛樂','動画・エンタメ','Video & entertainment'],
@@ -68,6 +105,21 @@ const SumiI18n = (() => {
       if(typeof value!=='number'||!Number.isFinite(value)||typeof currency!=='string'||!/^[A-Z]{3}$/.test(currency))return generic[current];
       return number(value,{style:'currency',currency,...options});
     }
+    function currencyName(code) {
+      const languageIndex=LANGUAGES.indexOf(current);
+      if(typeof code!=='string'||!/^[A-Z]{3}$/.test(code))return unknownCurrency[languageIndex];
+      if(Object.hasOwn(currencyNames,code))return currencyNames[code][languageIndex];
+      try{
+        const name=formatter('DisplayNames',{type:'currency',fallback:'none'}).of(code);
+        if(typeof name==='string'&&name.trim()&&name!==code)return name;
+      }catch{}
+      return unknownCurrency[languageIndex];
+    }
+    function currencyLabel(code) {
+      if(typeof code!=='string'||!/^[A-Z]{3}$/.test(code))return unknownCurrency[LANGUAGES.indexOf(current)];
+      const name=currencyName(code);
+      return current==='en'?`${code} (${name})`:`${code}（${name}）`;
+    }
     function date(value,options) {
       if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return generic[current];
       const parsed=new Date(value+'T12:00:00Z');
@@ -111,7 +163,7 @@ const SumiI18n = (() => {
       if(prefix)return error(prefix,depth+1)+' '+error(value.slice(prefix.length+1),depth+1);
       return fallback;
     }
-    return Object.freeze({getLanguage,setLanguage,t,number,money,date,dateTime,category,error,languages:LANGUAGES});
+    return Object.freeze({getLanguage,setLanguage,t,number,money,currencyName,currencyLabel,date,dateTime,category,error,languages:LANGUAGES});
   }
   return Object.freeze({...create(),create,normalize,languages:LANGUAGES});
 })();

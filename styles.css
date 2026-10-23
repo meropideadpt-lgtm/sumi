@@ -260,7 +260,7 @@ html[data-theme=dark] .iconbtn:hover{background:var(--dark-hover);border-radius:
 html[data-theme=dark] :is(.reminders,.detail-price,.logo-picker,.storage-notice,.stats-explanation,.fx-panel,.pwa-panel,.picker-current){background:var(--dark-raised);border-color:var(--dark-border)}
 html[data-theme=dark] :is(.notice,.stats-explanation){color:#b8d1f3}
 html[data-theme=dark] .logo-picker{border-color:#819ab8}
-/* Keep authentic black and colored brand marks on a neutral light tile. */
+/* Custom uploads keep their original colors on a neutral light tile. */
 html[data-theme=dark] img.logo{background:#f3f6fb}
 html[data-theme=dark] .logo.fallback{background:#2e3e53;color:#c0d0e4}
 html[data-theme=dark] .logo-modal .pick-item[aria-pressed=true]{background:var(--dark-hover);border-color:#9abbe5}
@@ -314,6 +314,13 @@ html:not([data-theme=dark]) .tag.failed{color:#945f5f}
 html:not([data-theme=dark]) :is(.stats-filter-error,.logo-error){color:#945f5f}
 html:not([data-theme=dark]) [data-delete]{color:#945f5f!important}
 html:not([data-theme=dark]) .logo.fallback{color:#6c7e96}
+
+/* Built-in marks are flat silhouettes; only these exact catalog assets invert.
+   Custom images (including existing inline/IndexedDB uploads) stay untouched. */
+html .logo.builtin{background:transparent;filter:brightness(0)}
+html[data-theme=dark] .logo.builtin{background:transparent;filter:brightness(0) invert(1)}
+html:not([data-theme=dark]) .logo.fallback{background:transparent;color:#182238}
+html[data-theme=dark] .logo.fallback{background:transparent;color:#e7ecf5}
 html:not([data-theme=dark]) input::placeholder{color:#637187;opacity:1}
 html:not([data-theme=dark]) :is(button,input,select):focus-visible{outline:2px solid #557fb4;outline-offset:3px}
 /* Stage six: one quiet motion rhythm; state changes do not replay on every render. */
@@ -378,3 +385,24 @@ html[data-motion=reduce],html[data-motion=reduce] *,html[data-motion=reduce] *::
 
 /* Hidden async states and file controls must stay hidden even with component display rules. */
 [hidden]{display:none!important}
+
+/* Editable category combobox: every preset is available without filtering the saved value. */
+.category-control{position:relative;display:flex;min-width:0}
+.category-control #category{padding-right:48px}
+.category-control #categoryToggle{position:absolute;right:1px;top:1px;bottom:1px;width:44px;display:grid;place-items:center;border:0;border-radius:0 9px 9px 0;background:transparent;color:#637187}
+.category-control #categoryToggle:hover{background:#edf4ff}
+.category-control #categoryToggle .icon{width:18px;height:18px;margin:0}
+.category-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;padding:5px;border:1px solid #e5eaf3;border-radius:10px;background:#fff;max-height:220px;overflow:auto;overscroll-behavior:contain;scroll-padding:5px}
+.category-options[hidden]{display:none}
+.category-options [data-category]{min-width:0;min-height:44px;padding:10px 12px;border:0;border-radius:6px;background:transparent;color:inherit;text-align:left;font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+.category-options [data-category]:is(:hover,.is-active){background:#edf4ff}
+.category-hint{margin:0;line-height:1.6}
+html[data-theme=dark] .category-control #categoryToggle{color:var(--dark-muted)}
+html[data-theme=dark] .category-options{background:var(--dark-surface);color:var(--dark-text);border-color:var(--dark-border)}
+html[data-theme=dark] .category-control #categoryToggle:hover,html[data-theme=dark] .category-options [data-category]:is(:hover,.is-active){background:var(--dark-hover)}
+@media(max-width:420px){.category-options{grid-template-columns:1fr;max-height:200px}}
+
+/* Localized currency names need a full form row without shrinking touch text. */
+.form-grid>.service-autocomplete{grid-column:2/-1}
+.form-grid>.currency-field{grid-column:1/-1}
+.settings-row #currency{width:min(100%,360px);max-width:none}

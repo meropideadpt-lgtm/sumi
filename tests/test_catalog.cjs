@@ -128,19 +128,34 @@ test('bundled SVGs are static self-contained geometry without executable or netw
   assert.equal(files.length,manifest.assets.length);
 });
 
-test('license notices and the only viewport-only modification remain documented', () => {
+test('license notices, original hashes and monochrome derivations remain documented', () => {
   for(const file of ['LICENSE-simple-icons.txt','DISCLAIMER-simple-icons.md','LICENSE-lobe-icons.txt',
     'LICENSE-dashboard-icons.txt','LICENSE-primer-octicons.txt']){
     assert.ok(fs.readFileSync(path.join(root,'assets/brands',file),'utf8').length>500,file);
   }
   const modifications=manifest.assets.filter(asset=>asset.modifications.length);
-  assert.equal(modifications.length,1);
-  assert.equal(modifications[0].id,'google-one');
-  assert.match(modifications[0].modifications[0],/viewBox/);
-  assert.notEqual(modifications[0].sha256,modifications[0].originalSha256);
+  assert.deepEqual(modifications.map(asset=>asset.id).sort(),
+    ['adobe','disney-plus','google-one','microsoft-365','onedrive','playstation-plus','prime-video','xbox-game-pass']);
+  for(const asset of modifications){
+    assert.match(asset.originalSha256,/^[a-f0-9]{64}$/);
+    assert.notEqual(asset.sha256,asset.originalSha256);
+    assert.ok(asset.modifications.some(note=>note.includes('单色适配')),asset.id);
+  }
+  assert.match(modifications.find(asset=>asset.id==='google-one').modifications[0],/viewBox/);
   const copilot=manifest.assets.find(asset=>asset.id==='github-copilot');
   assert.equal(copilot.brandLicense.type,'MIT');
   assert.ok(fs.existsSync(path.join(root,copilot.brandLicense.noticeFile)));
+});
+
+test('built-in SVG marks contain no gradients, colored fills or shadow effects', () => {
+  for(const asset of manifest.assets){
+    const svg=fs.readFileSync(path.join(root,asset.path),'utf8');
+    assert.doesNotMatch(svg,/<(?:linearGradient|radialGradient|filter)\b|\bfilter\s*=|box-shadow|drop-shadow/i,asset.id);
+    for(const fill of svg.matchAll(/\bfill\s*=\s*["']([^"']+)["']/g)){
+      assert.ok(['#000','currentColor','none'].includes(fill[1]),asset.id+': '+fill[1]);
+    }
+    assert.doesNotMatch(svg,/(?:fill|stroke)\s*:\s*(?:#|rgb|hsl)/i,asset.id);
+  }
 });
 
 test('legacy URL mappings are exact same-brand URLs and do not invent parent-brand associations', () => {

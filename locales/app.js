@@ -1098,4 +1098,9 @@ Object.assign(globalThis.SumiMessages, {
     "en": "{name} Logo"
   }
 });
+Object.assign(globalThis.SumiMessages, {
+  "app.chooseCategory": {"zh-CN":"选择分类","zh-TW":"選擇分類","ja-JP":"カテゴリを選択","en":"Choose a category"},
+  "app.presetCategories": {"zh-CN":"内置分类","zh-TW":"內建分類","ja-JP":"標準カテゴリ","en":"Preset categories"},
+  "app.categoryHint": {"zh-CN":"选择内置分类，或直接输入自定义分类。","zh-TW":"選擇內建分類，或直接輸入自訂分類。","ja-JP":"標準カテゴリを選択するか、独自のカテゴリを入力できます。","en":"Choose a preset or type your own category."}
+});
 if(typeof module!=='undefined')module.exports=globalThis.SumiMessages;

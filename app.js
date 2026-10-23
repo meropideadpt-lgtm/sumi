@@ -20,9 +20,61 @@ const nav=[['home','home'],['list','list'],['stats','stats'],['calendar','calend
 const categoryValues=['未分类','影音娱乐','音乐音频','AI 工具','工作效率','办公效率','云存储','游戏','设计','学习教育','开发工具','生活服务','其他'];
 function setCategoryInput(value){const input=$('#category');if(!input)return;input.value=SumiI18n.category(value);input.dataset.originalCategory=value;input.dataset.originalLabel=input.value}
 function readCategoryInput(){const input=$('#category'),value=input.value.trim();if(value===input.dataset.originalLabel)return input.dataset.originalCategory;return categoryValues.find(item=>SumiI18n.category(item)===value)||value||'未分类'}
+function categoryPickerHtml(category,label){
+  return `<div class="field category-field"><label for="category">${tx('category')}</label><div class="category-control"><input id="category" maxlength="30" value="${esc(label)}" data-original-category="${esc(category)}" data-original-label="${esc(label)}" autocomplete="off" role="combobox" aria-autocomplete="none" aria-haspopup="listbox" aria-controls="categoryOptions" aria-expanded="false" aria-describedby="categoryHint"><button id="categoryToggle" type="button" aria-label="${tx('chooseCategory')}" aria-controls="categoryOptions" aria-expanded="false">${sumiIcon('chevron-down')}</button></div><div id="categoryOptions" class="category-options" role="listbox" aria-label="${tx('presetCategories')}" hidden>${categoryValues.map((value,index)=>`<button id="category-option-${index}" type="button" tabindex="-1" role="option" data-category="${esc(value)}" aria-selected="${value===category?'true':'false'}">${esc(SumiI18n.category(value))}</button>`).join('')}</div><p id="categoryHint" class="small category-hint">${tx('categoryHint')}</p></div>`;
+}
+function bindCategoryPicker(){
+  const input=$('#category'),toggle=$('#categoryToggle'),list=$('#categoryOptions'),field=input?.closest('.category-field');
+  if(!input||!toggle||!list||!field)return;
+  const options=[...list.querySelectorAll('[data-category]')];let index=-1,composing=false;
+  const highlight=()=>{
+    options.forEach((option,i)=>{option.classList.toggle('is-active',i===index);option.setAttribute('aria-selected',String(i===index))});
+    if(!list.hidden&&index>=0)input.setAttribute('aria-activedescendant',options[index].id);else input.removeAttribute('aria-activedescendant');
+  };
+  const close=()=>{list.hidden=true;input.setAttribute('aria-expanded','false');toggle.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant')};
+  const open=()=>{
+    // Always show every preset, including when the current value is Uncategorized.
+    index=options.findIndex(option=>option.dataset.category===readCategoryInput());
+    list.hidden=false;input.setAttribute('aria-expanded','true');toggle.setAttribute('aria-expanded','true');highlight();
+  };
+  const choose=option=>{
+    setCategoryInput(option.dataset.category);close();
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+  };
+  input.addEventListener('click',open);
+  toggle.addEventListener('click',()=>{if(list.hidden)open();else close()});
+  // Focus alone never opens the list, so selecting an option cannot reopen it.
+  // Collapse this in-flow list after click activation, not between pointerdown
+  // and click, which would move the Save button out from under a touch.
+  $('#modalOverlay')?.addEventListener('click',event=>{if(!field.contains(event.target))close()});
+  input.addEventListener('compositionstart',()=>{composing=true});
+  input.addEventListener('compositionend',()=>{composing=false});
+  input.addEventListener('input',()=>{if(!list.hidden){index=options.findIndex(option=>option.dataset.category===readCategoryInput());highlight()}});
+  const onKey=event=>{
+    if(composing||event.isComposing){if(['Enter','Escape'].includes(event.key))event.stopPropagation();return}
+    const focusedOption=options.indexOf(event.target.closest('[data-category]'));
+    if(focusedOption>=0)index=focusedOption;
+    if(event.key==='Escape'&&!list.hidden){event.preventDefault();event.stopPropagation();close();return}
+    if(event.key==='Tab'){close();return}
+    if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+      event.preventDefault();if(list.hidden){open();if(index<0)index=event.key==='ArrowDown'?0:options.length-1}
+      else if(index<0)index=event.key==='ArrowDown'?0:options.length-1;
+      else index=(index+(event.key==='ArrowDown'?1:-1)+options.length)%options.length;
+      highlight();if(focusedOption>=0)options[index].focus({preventScroll:true});options[index].scrollIntoView({block:'nearest'});return;
+    }
+    if(event.key==='Enter'&&!list.hidden){event.preventDefault();if(index>=0)choose(options[index]);else close()}
+  };
+  field.addEventListener('keydown',onKey);
+  options.forEach(option=>{
+    // Mouse selection keeps the editing caret; touch keeps native scrolling.
+    option.addEventListener('pointerdown',event=>{if(event.pointerType==='mouse')event.preventDefault()});
+    option.addEventListener('click',()=>choose(option));
+  });
+}
 function render(){
+  fxRenderPending=false;
   SumiI18n.setLanguage(preferences.language);document.documentElement.lang=SumiI18n.getLanguage();SumiTheme.apply(preferences.theme);SumiMotion.apply(preferences.motion);
-  $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand">sumi</div><nav class="nav" aria-label="${tx('nav.main')}">${nav.map(([key,icon])=>`<button class="${view===key?'active':''} ${key==='settings'?'settings-link':''}" data-nav="${key}" ${view===key?'aria-current="page"':''}><span class="symbol">${sumiIcon(icon)}</span>${tx('nav.'+key)}</button>`).join('')}</nav></aside><main class="main view-${view}">${storage.issues.length?`<div class="storage-notice" role="alert">${storage.issues.map(issue=>esc(errorText(issue))).join(' ')} <button class="linkbtn" id="exportRaw">${tx('exportRaw')}</button></div>`:''}<header class="top"><div><h1>${tx('nav.'+view)}</h1><p class="sub">${tx('subtitle.'+view)}</p></div>${view!=='settings'?`<button class="primary" data-add>${sumiIcon('plus')}${tx('addSubscription')}</button>`:''}</header>${({home:homePage,list:listPage,stats:statsPage,calendar:calendarPage,settings:settingsPage})[view]()}</main></div>${modal?modalHtml():''}${detailId?detailHtml():''}${picker?pickerHtml():''}${paymentModal?paymentHtml():''}`;bind();SumiMotion.afterRender({view,modal,detailId,picker,paymentModal});showLogoStorageWarning();
+  $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand">sumi</div><nav class="nav" aria-label="${tx('nav.main')}">${nav.map(([key,icon])=>`<button class="${view===key?'active':''} ${key==='settings'?'settings-link':''}" data-nav="${key}" ${view===key?'aria-current="page"':''}><span class="symbol">${sumiIcon(icon)}</span>${tx('nav.'+key)}</button>`).join('')}</nav></aside><main class="main view-${view}">${storage.issues.length?`<div class="storage-notice" role="alert">${storage.issues.map(issue=>esc(errorText(issue))).join(' ')} <button class="linkbtn" id="exportRaw">${tx('exportRaw')}</button></div>`:''}<header class="top"><div><h1>${tx('nav.'+view)}</h1><p class="sub">${tx('subtitle.'+view)}</p></div>${view==='home'?`<button class="primary" data-add>${sumiIcon('plus')}${tx('addSubscription')}</button>`:''}</header>${({home:homePage,list:listPage,stats:statsPage,calendar:calendarPage,settings:settingsPage})[view]()}</main></div>${modal?modalHtml():''}${detailId?detailHtml():''}${picker?pickerHtml():''}${paymentModal?paymentHtml():''}`;bind();SumiMotion.afterRender({view,modal,detailId,picker,paymentModal});showLogoStorageWarning();
 }
 const metrics=()=>{
   const subscriptions=data.subscriptions.filter(active),next=[...subscriptions].sort((a,b)=>a.nextDate.localeCompare(b.nextDate))[0];
@@ -53,10 +105,52 @@ function calendarPage(){
   return `<div class="card"><div class="section-title"><h2>${esc(dateText(month,{year:'numeric',month:'long'}))}</h2><div class="month-switch"><button class="secondary" data-month="-1" aria-label="${tx('previousMonth')}">${sumiIcon('chevron-left')}</button><button class="secondary" data-month="1" aria-label="${tx('nextMonth')}">${sumiIcon('chevron-right')}</button></div></div><div class="calendar-grid">${[5,6,7,8,9,10,11].map(day=>`<div class="small calendar-weekday">${esc(dateText(`2026-01-${String(day).padStart(2,'0')}`,{weekday:'short'}))}</div>`).join('')}${cells.join('')}</div><p class="note">${tx('calendarNote')}</p></div>`;
 }
 function settingsPage(){return `<div class="card"><div class="settings-row"><label for="language">${tx('language')}</label><select class="select" id="language">${[['zh-CN','简体中文'],['zh-TW','繁體中文'],['ja-JP','日本語'],['en','English']].map(([value,label])=>`<option value="${value}" ${preferences.language===value?'selected':''}>${label}</option>`).join('')}</select></div><div class="settings-row"><label for="currency">${tx('displayCurrency')}</label><select class="select" id="currency">${currencyOptions(preferences.currency)}</select></div>${fxPanel()}<div class="settings-row"><label for="theme">${tx('appearance')}</label><select class="select" id="theme">${['light','dark','system'].map(value=>`<option value="${value}" ${preferences.theme===value?'selected':''}>${tx(value)}</option>`).join('')}</select></div><div class="settings-row"><label for="motion">${tx6('motion')}</label><select class="select" id="motion">${['system','reduce'].map(value=>`<option value="${value}" ${(preferences.motion||'system')===value?'selected':''}>${tx6('motion.'+value)}</option>`).join('')}</select></div><div class="settings-row"><label for="reminder">${tx('siteReminder')}</label><select class="select" id="reminder">${[0,1,3,7,14].map(value=>`<option value="${value}" ${Number(preferences.reminder)===value?'selected':''}>${value?tx('daysBefore',{count:numberText(value)}):tx('onDay')}</option>`).join('')}</select></div><div class="settings-row"><label>${tx('backupRestore')}</label><div class="tools"><button class="secondary" id="export">${tx(storage.issues.length?'exportRaw':'exportJSON')}</button><button class="secondary" id="import">${tx('importJSON')}</button><input id="importFile" type="file" accept=".json,application/json" hidden></div></div><p class="note">${tx('backupNote')}</p>${SumiPWA.settingsMarkup()}</div>`}
+// Native pickers belong to the browser. Keep their attached select and option
+// nodes when a preference changes; recreating and focusing them can reopen iPad pickers.
+function refreshSettingsView(){
+  SumiI18n.setLanguage(preferences.language);document.documentElement.lang=SumiI18n.getLanguage();SumiTheme.apply(preferences.theme);SumiMotion.apply(preferences.motion);
+  const main=$('.view-settings');if(!main)return;
+  $('.nav').setAttribute('aria-label',t('nav.main'));
+  document.querySelectorAll('[data-nav]').forEach(button=>{button.lastChild.textContent=t('nav.'+button.dataset.nav)});
+  main.querySelector('.top h1').textContent=t('nav.settings');main.querySelector('.top .sub').textContent=t('subtitle.settings');
+  const template=document.createElement('template');template.innerHTML=settingsPage();
+  const source=template.content;
+  for(const key of ['language','currency','theme','motion','reminder']){
+    const control=$('#'+key),next=source.querySelector('#'+key);
+    main.querySelector(`label[for="${key}"]`).textContent=source.querySelector(`label[for="${key}"]`).textContent;
+    // Update translated labels without replacing existing option nodes or rebinding events.
+    for(const option of next.options){
+      let current=Array.from(control.options).find(item=>item.value===option.value);
+      if(!current){current=option.cloneNode(true);control.append(current)}
+      else if(current.textContent!==option.textContent)current.textContent=option.textContent;
+    }
+    for(const option of Array.from(control.options))if(!Array.from(next.options).some(item=>item.value===option.value))option.remove();
+    if(control.value!==String(preferences[key]))control.value=String(preferences[key]);
+  }
+  $('#export').textContent=t(storage.issues.length?'exportRaw':'exportJSON');$('#import').textContent=t('importJSON');
+  $('#export').closest('.settings-row').querySelector('label').textContent=t('backupRestore');
+  main.querySelector(':scope > .card > .note').textContent=t('backupNote');
+  const notice=main.querySelector('.storage-notice:has(#exportRaw)');
+  if(notice){notice.firstChild.textContent=storage.issues.map(issue=>errorText(issue)).join(' ')+' ';$('#exportRaw').textContent=t('exportRaw')}
+  if($('#logoStorageNotice'))$('#logoStorageNotice').textContent=t6('missingLogo');
+  refreshFxPanel();refreshPwaPanel();
+}
+function refreshFxPanel(){
+  const panel=$('.fx-panel');if(!panel)return;
+  panel.outerHTML=fxPanel();$('#refreshRates')?.addEventListener('click',()=>fxManager.refresh({force:true}));
+}
+function refreshPwaPanel(){
+  const panel=$('#pwaPanel');if(!panel)return;
+  // Only restore a replaced PWA button, never an unrelated native select.
+  const focused=document.activeElement,focusId=panel.contains(focused)?focused.id:null;
+  panel.outerHTML=SumiPWA.settingsMarkup();SumiPWA.bind();
+  if(focusId)document.getElementById(focusId)?.focus({preventScroll:true});
+}
+function nativePickerFocused(){return $('#categoryOptions')?.hidden===false||document.activeElement?.matches('select,input[list],input[type="date"],input[type="month"],#category,#categoryToggle,[data-category]')}
 function modalHtml(){
   const s=formDraft||(modal==='new'?{name:'',amount:'',currency:'CNY',months:1,nextDate:today(),status:'active',autoRenew:true,logo:''}:data.subscriptions.find(x=>x.id===modal));if(!s)return '';
   const category=s.category||'未分类',categoryLabel=SumiI18n.category(category);
-  return `<div class="overlay" id="modalOverlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="subscriptionTitle"><div class="modal-head"><h2 id="subscriptionTitle">${tx(modal==='new'?'addSubscription':'editSubscription')}</h2><button class="iconbtn" data-close aria-label="${tx('closeSubscription')}">${sumiIcon('close')}</button></div><form id="subscriptionForm"><div class="form-grid"><div><label class="small">${tx('logo')}</label><button class="logo-picker" type="button" id="openPicker" aria-label="${tx('changeLogo')}">${logoMarkup(s.name,s.logo)}</button></div><div class="field service-autocomplete"><label for="name">${tx('subscriptionName')}</label><input id="name" required maxlength="70" value="${esc(s.name)}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-controls="suggestions" aria-expanded="false"><div id="suggestions" class="service-suggestions" role="listbox" aria-label="${tx('matchedServices')}" hidden></div></div><div class="field"><label for="formCurrency">${tx('originalCurrency')}</label><select id="formCurrency">${currencyOptions(s.currency)}</select></div><div class="field" style="grid-column:2"><label for="nextDate">${tx('nextRenewal')}</label><input id="nextDate" type="date" min="0001-01-01" max="9999-12-31" required value="${esc(s.nextDate)}"></div><div class="field"><label for="amount">${tx('amount')}</label><input id="amount" type="number" required min="0" step="0.01" value="${esc(s.amount)}"></div><div class="field" style="grid-column:2"><label for="months">${tx('cycle')}</label><select id="months">${[1,3,6,12].map(n=>`<option value="${n}" ${Number(s.months)===n?'selected':''}>${tx('months',{count:numberText(n)})}</option>`).join('')}</select></div><div class="field"><label for="status">${tx('subscriptionStatus')}</label><select id="status"><option value="active" ${active(s)?'selected':''}>${tx('active')}</option><option value="cancelled" ${!active(s)?'selected':''}>${tx('cancelled')}</option></select></div><div class="field" style="grid-column:2"><label for="autoRenew">${tx('autoRenew')}</label><select id="autoRenew"><option value="true" ${s.autoRenew?'selected':''}>${tx('on')}</option><option value="false" ${!s.autoRenew?'selected':''}>${tx('off')}</option></select></div></div><div class="field category-field"><label for="category">${tx('category')}</label><input id="category" maxlength="30" value="${esc(categoryLabel)}" data-original-category="${esc(category)}" data-original-label="${esc(categoryLabel)}" list="categoryOptions"><datalist id="categoryOptions">${categoryValues.map(value=>`<option value="${esc(SumiI18n.category(value))}"></option>`).join('')}</datalist></div><div class="modal-actions"><button class="secondary" type="button" data-close>${tx('cancel')}</button><button class="primary" type="submit">${tx(modal==='new'?'add':'saveChanges')}</button></div></form></div></div>`;
+  return `<div class="overlay" id="modalOverlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="subscriptionTitle"><div class="modal-head"><h2 id="subscriptionTitle">${tx(modal==='new'?'addSubscription':'editSubscription')}</h2><button class="iconbtn" data-close aria-label="${tx('closeSubscription')}">${sumiIcon('close')}</button></div><form id="subscriptionForm"><div class="form-grid"><div><label class="small">${tx('logo')}</label><button class="logo-picker" type="button" id="openPicker" aria-label="${tx('changeLogo')}">${logoMarkup(s.name,s.logo)}</button></div><div class="field service-autocomplete"><label for="name">${tx('subscriptionName')}</label><input id="name" required maxlength="70" value="${esc(s.name)}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-controls="suggestions" aria-expanded="false"><div id="suggestions" class="service-suggestions" role="listbox" aria-label="${tx('matchedServices')}" hidden></div></div><div class="field currency-field"><label for="formCurrency">${tx('originalCurrency')}</label><select id="formCurrency">${currencyOptions(s.currency)}</select></div><div class="field" style="grid-column:2"><label for="nextDate">${tx('nextRenewal')}</label><input id="nextDate" type="date" min="0001-01-01" max="9999-12-31" required value="${esc(s.nextDate)}"></div><div class="field"><label for="amount">${tx('amount')}</label><input id="amount" type="number" required min="0" step="0.01" value="${esc(s.amount)}"></div><div class="field" style="grid-column:2"><label for="months">${tx('cycle')}</label><select id="months">${[1,3,6,12].map(n=>`<option value="${n}" ${Number(s.months)===n?'selected':''}>${tx('months',{count:numberText(n)})}</option>`).join('')}</select></div><div class="field"><label for="status">${tx('subscriptionStatus')}</label><select id="status"><option value="active" ${active(s)?'selected':''}>${tx('active')}</option><option value="cancelled" ${!active(s)?'selected':''}>${tx('cancelled')}</option></select></div><div class="field" style="grid-column:2"><label for="autoRenew">${tx('autoRenew')}</label><select id="autoRenew"><option value="true" ${s.autoRenew?'selected':''}>${tx('on')}</option><option value="false" ${!s.autoRenew?'selected':''}>${tx('off')}</option></select></div></div>${categoryPickerHtml(category,categoryLabel)}<div class="modal-actions"><button class="secondary" type="button" data-close>${tx('cancel')}</button><button class="primary" type="submit">${tx(modal==='new'?'add':'saveChanges')}</button></div></form></div></div>`;
 }
 function shortDate(value){return value?dateText(value,{month:'short',day:'numeric'}):t('none')}
 function mobileSummary(){
@@ -110,14 +204,15 @@ function paymentHtml(){
   return `<div class="overlay payment-overlay" id="paymentOverlay"><div class="modal payment-modal" role="dialog" aria-modal="true" aria-labelledby="paymentTitle"><div class="modal-head"><h2 id="paymentTitle">${tx(old?'editPayment':'recordPayment')}</h2><button class="iconbtn" data-close-payment aria-label="${tx('closePayment')}">${sumiIcon('close')}</button></div><form id="paymentForm"><div class="field"><label for="paymentDate">${tx('paymentDate')}</label><input id="paymentDate" type="date" required min="0001-01-01" max="${today()}" value="${esc(p.date)}"></div><div class="field"><label for="paymentAmount">${tx('paymentAmount')}</label><input id="paymentAmount" type="number" required min="0" step="${old?'any':'0.01'}" value="${esc(p.amount)}"></div><div class="field"><label for="paymentCurrency">${tx('originalCurrency')}</label><select id="paymentCurrency">${currencyOptions(p.currency)}</select></div><div class="field"><label for="paymentCycleDate">${tx('optionalCycle')}</label><input id="paymentCycleDate" type="date" min="0001-01-01" max="9999-12-31" value="${esc(p.cycleDate||'')}"></div><div class="field"><label for="paymentStatus">${tx('paymentResult')}</label><select id="paymentStatus"><option value="succeeded" ${SumiBilling.successful(p)?'selected':''}>${tx('paymentSuccess')}</option><option value="failed" ${p.status==='failed'?'selected':''}>${tx('paymentFailed')}</option></select></div><p class="note">${old?.scheduleArchived?tx('archivedPaymentNote')+' ':''}${tx('paymentNote')}</p><div class="modal-actions"><button class="secondary" type="button" data-close-payment>${tx('cancel')}</button><button class="primary" type="submit">${tx('savePayment')}</button></div></form></div></div>`;
 }
 
-function neutralLogo(name){return `<span class="logo fallback" role="img" aria-label="${tx(name?'namedNoLogo':'noLogo',{name})}">${sumiIcon('image')}</span>`}
+function neutralLogo(name){return `<span class="logo fallback" role="img" aria-label="${tx(name?'namedNoLogo':'noLogo',{name})}">${sumiIcon('service')}</span>`}
 function resolvedLogo(url){
   const local=SumiCatalog.all.find(service=>service.logo&&service.legacyUrls?.includes(url));
   return local?.logo||url;
 }
 function logoMarkup(name,url){
   const source=resolvedLogo(url);
-  return SumiData.safeLogo(source)?`<img class="logo" ${SumiLogoStore.isReference(source)?`data-logo-ref="${esc(source)}"`:`src="${esc(source)}"`} loading="${picker||modal||detailId||view==='stats'?'eager':'lazy'}" width="40" height="40" alt="${tx('namedLogo',{name:name||t('subscription')})}" decoding="async" referrerpolicy="no-referrer" data-logo-image data-logo-name="${esc(name||'')}">`:neutralLogo(name);
+  const builtin=SumiCatalog.all.some(service=>service.logo&&service.logo===source);
+  return SumiData.safeLogo(source)?`<img class="logo${builtin?' builtin':''}" ${SumiLogoStore.isReference(source)?`data-logo-ref="${esc(source)}"`:`src="${esc(source)}"`} loading="${picker||modal||detailId||view==='stats'?'eager':'lazy'}" width="40" height="40" alt="${tx('namedLogo',{name:name||t('subscription')})}" decoding="async" referrerpolicy="no-referrer" data-logo-image data-logo-name="${esc(name||'')}">`:neutralLogo(name);
 }
 function statisticsLogo(name,subscriptionId){
   const subscription=data.subscriptions.find(item=>item.id===subscriptionId);
@@ -216,7 +311,7 @@ const fxManager=SumiFx.createManager({storage:{getItem:key=>localStorage.getItem
 function refreshFxView(){
   if(!uiReady)return;
   // Preserve the active native IME input until composition has committed.
-  if(nameComposing||pickerComposing){fxRenderPending=true;return}
+  if(nameComposing||pickerComposing||nativePickerFocused()){fxRenderPending=true;refreshFxPanel();return}
   fxRenderPending=false;
   captureDraft();capturePaymentDraft();captureStatsFilters();
   const focused=document.activeElement,focusId=focused?.id,position=focused?.selectionStart,scroll=window.scrollY;
@@ -228,7 +323,7 @@ function refreshFxView(){
 fxState=fxManager.getState();
 function currencyOptions(selected){
   const codes=[...new Set([...commonCurrencies,...Object.keys(fxState.currencies||{}),...data.subscriptions.map(s=>s.currency),...data.payments.map(p=>p.currency),preferences.currency,selected])].filter(code=>/^[A-Z]{3}$/.test(code));
-  return codes.map(code=>`<option value="${code}" ${code===selected?'selected':''}>${code}${SumiFx.supported(code,fxState.snapshot)===false?tx('unsupportedCurrency'):''}</option>`).join('');
+  return codes.map(code=>`<option value="${code}" ${code===selected?'selected':''}>${esc(SumiI18n.currencyLabel(code))}${SumiFx.supported(code,fxState.snapshot)===false?tx('unsupportedCurrency'):''}</option>`).join('');
 }
 function referenceQuote(amount,from,to=preferences.currency){return SumiFx.quote(amount,from,to,fxState.snapshot)}
 function rangeFor(filters){
@@ -255,6 +350,18 @@ function statsPage(){
   const needsBaseline=data.subscriptions.some(subscription=>!tracked.has(subscription.id));
   const baseline=needsBaseline?`<div class="card section"><p class="note">${tx('baselineNote')}</p><button class="secondary" id="startCostHistory">${tx('recordBaseline')}</button></div>`:'';
   return sumiStatisticsView(model,statsFilters,{esc,money:moneyDisplay,original,icon:sumiIcon,logo:statisticsLogo})+baseline;
+}
+function refreshStatsView(){
+  const form=$('#statsFilters');if(!form)return;
+  const template=document.createElement('template');template.innerHTML=statsPage();
+  const nextForm=template.content.querySelector('#statsFilters');
+  // Keep the period select attached while changing the date controls and results.
+  while(form.children.length>1)form.lastElementChild.remove();
+  for(const child of Array.from(nextForm.children).slice(1))form.append(child);
+  nextForm.remove();
+  while(form.nextSibling)form.nextSibling.remove();
+  form.after(template.content);bindValidation();bindLogos();
+  $('#startCostHistory')?.addEventListener('click',()=>{if(updateData(()=>{}))render()});
 }
 function chart(){
   const d=new Date(today()+'T12:00:00Z');d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-5);
@@ -301,7 +408,7 @@ function captureDraft(){
 function bindLogos(){
   document.querySelectorAll('img[data-logo-image]').forEach(img=>{
     if(img.dataset.logoBound)return;img.dataset.logoBound='true';
-    const fallback=()=>{const el=document.createElement('span');el.className='logo fallback';el.setAttribute('role','img');el.setAttribute('aria-label',t(img.dataset.logoName?'namedNoLogo':'noLogo',{name:img.dataset.logoName}));el.innerHTML=sumiIcon('image');img.replaceWith(el)};
+    const fallback=()=>{const el=document.createElement('span');el.className='logo fallback';el.setAttribute('role','img');el.setAttribute('aria-label',t(img.dataset.logoName?'namedNoLogo':'noLogo',{name:img.dataset.logoName}));el.innerHTML=sumiIcon('service');img.replaceWith(el)};
     img.addEventListener('error',fallback,{once:true});
     if(img.dataset.logoRef){
       SumiLogoStore.resolve(img.dataset.logoRef).then(source=>{if(!img.isConnected)return;if(source)img.src=source;else{logoStorageWarning=true;fallback();showLogoStorageWarning()}}).catch(()=>{if(img.isConnected){logoStorageWarning=true;fallback();showLogoStorageWarning()}});
@@ -338,7 +445,7 @@ function bind(){
   bindLogos();bindValidation();SumiPWA.bind();
   $('#refreshRates')?.addEventListener('click',()=>fxManager.refresh({force:true}));
   $('#startCostHistory')?.addEventListener('click',()=>{if(updateData(()=>{}))render()});
-  $('#statsMode')?.addEventListener('change',()=>{captureStatsFilters();statsFilters.error='';render()});
+  $('#statsMode')?.addEventListener('change',()=>{captureStatsFilters();statsFilters.error='';refreshStatsView()});
   $('#statsFilters')?.addEventListener('submit',e=>{e.preventDefault();captureStatsFilters();render()});
   $('[data-show-subscriptions]')?.addEventListener('click',()=>{view='list';filter='';render()});
   $('#exportRaw')?.addEventListener('click',()=>downloadJson(storage.rawBackup(),`sumi-recovery-${today()}.json`));
@@ -368,7 +475,7 @@ function bind(){
     }))return;
     modal=null;formDraft=null;selectedLogo='';render();
   });
-  bindServiceSearch();
+  bindServiceSearch();bindCategoryPicker();
   bindDialogKeys($('#modalOverlay .modal'),closeModal);
   $('#closePicker')?.addEventListener('click',closePicker);
   $('#pickerOverlay')?.addEventListener('click',event=>{if(event.target.id==='pickerOverlay')closePicker()});
@@ -451,7 +558,7 @@ function bind(){
   });
   document.querySelectorAll('[data-month]').forEach(b=>b.onclick=()=>{calOffset+=Number(b.dataset.month);render()});
   for(const key of ['currency','theme','reminder','language','motion'])$('#'+key)?.addEventListener('change',e=>{
-    commitPreferences({...preferences,[key]:key==='reminder'?Number(e.target.value):e.target.value});render();$('#'+key)?.focus();
+    commitPreferences({...preferences,[key]:key==='reminder'?Number(e.target.value):e.target.value});refreshSettingsView();
   });
   $('#export')?.addEventListener('click',async event=>{
     if(exporting)return;exporting=true;event.currentTarget.disabled=true;
@@ -478,6 +585,17 @@ function bind(){
   });
 }
 render();uiReady=true;fxManager.refresh();
-SumiPWA.start({isBusy:()=>Boolean(modal||paymentModal||picker||logoUploading||exporting||importing||confirming),onChange:()=>{const panel=$('#pwaPanel');if(panel){const focusId=document.activeElement?.id;panel.outerHTML=SumiPWA.settingsMarkup();SumiPWA.bind();if(focusId)document.getElementById(focusId)?.focus({preventScroll:true})}}});
+SumiPWA.start({isBusy:()=>Boolean(modal||paymentModal||picker||logoUploading||exporting||importing||confirming),onChange:refreshPwaPanel});
+// Finish deferred FX presentation after a click or keyboard action completes.
+// A focusout repaint would remove the next button between pointerdown and click.
+// The state/cache is already current; no timers, blur(), or picker reopening is needed.
+function finishPickerInteraction(event){
+  const label=event.target.closest?.('label');
+  if(label?.control?.matches('select,input[list],input[type="date"],input[type="month"],input[type="file"]'))return;
+  if(event.target.closest?.('button[type=submit],input[type=submit],input[type=file],#import'))return;
+  if(fxRenderPending)queueMicrotask(()=>{if(fxRenderPending&&!nativePickerFocused()&&!modal&&!paymentModal&&!picker)refreshFxView()});
+}
+document.addEventListener('click',finishPickerInteraction);
+document.addEventListener('keyup',finishPickerInteraction);
 setInterval(()=>fxManager.refresh(),60*60*1000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)fxManager.refresh()});

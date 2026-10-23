@@ -66,8 +66,8 @@
       "id": "disney-plus",
       "name": "Disney+",
       "path": "assets/brands/disney-plus.svg",
-      "sha256": "cdc480ea45b4fe48c3503e118d763f959ec9affdb645c1a71467b24b108a15ee",
-      "bytes": 5710,
+      "sha256": "cf8f88099e38f2093646506758c8890a332b994e09f3aa90ad4ba36ab81b335d",
+      "bytes": 4626,
       "downloadUrl": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/320c819da84048d5a3066e2578bfa83be9019fdf/svg/disney-plus.svg",
       "provider": "dashboard-icons",
       "version": null,
@@ -80,7 +80,9 @@
       "guidelines": null,
       "note": null,
       "originalSha256": "cdc480ea45b4fe48c3503e118d763f959ec9affdb645c1a71467b24b108a15ee",
-      "modifications": []
+      "modifications": [
+        "单色适配：移除不透明背景与渐变，保留原有文字、加号和弧线路径，裁切 viewBox 至品牌内容。"
+      ]
     },
     {
       "id": "bilibili",
@@ -126,8 +128,8 @@
       "id": "prime-video",
       "name": "Prime Video",
       "path": "assets/brands/prime-video.svg",
-      "sha256": "eec3405c643b9751672426ca22b84fe3083dd92b7d2ea277eb4673f4efdae33f",
-      "bytes": 17654,
+      "sha256": "ef663735ca5a857b2be8c9e245fe5a3186ca0a3db727a174b91353c232f9de8a",
+      "bytes": 17402,
       "downloadUrl": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/320c819da84048d5a3066e2578bfa83be9019fdf/svg/prime-video-alt.svg",
       "provider": "dashboard-icons",
       "version": null,
@@ -140,7 +142,9 @@
       "guidelines": null,
       "note": null,
       "originalSha256": "eec3405c643b9751672426ca22b84fe3083dd92b7d2ea277eb4673f4efdae33f",
-      "modifications": []
+      "modifications": [
+        "单色适配：移除不可见彩色矩形及冗余样式，保留原黑色 Prime Video 路径。"
+      ]
     },
     {
       "id": "crunchyroll",
@@ -510,8 +514,8 @@
       "id": "google-one",
       "name": "Google One",
       "path": "assets/brands/google-one.svg",
-      "sha256": "84d9e9d4da842cf84dd3e2b8030f08ef89c386a9433a829298ad6f22f835a636",
-      "bytes": 1674,
+      "sha256": "3b9a5bad0ef29fcc5ced6af3e6e79b12fbf59f8b0c247ef0c39e80318b03d7c6",
+      "bytes": 1404,
       "downloadUrl": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/320c819da84048d5a3066e2578bfa83be9019fdf/svg/google-one.svg",
       "provider": "dashboard-icons",
       "version": null,
@@ -525,7 +529,8 @@
       "note": null,
       "originalSha256": "913e54467d24066de0bbe34f6a00969223aba70e736316e1539c7f2ea3176afd",
       "modifications": [
-        "仅依据原始 width/height 补充等比例 viewBox；路径、颜色和几何未修改。"
+        "仅依据原始 width/height 补充等比例 viewBox；路径、颜色和几何未修改。",
+        "单色适配：移除渐变，将原四段路径统一为黑色；保留原坐标和现有 viewBox。"
       ]
     },
     {
@@ -552,8 +557,8 @@
       "id": "onedrive",
       "name": "OneDrive",
       "path": "assets/brands/onedrive.svg",
-      "sha256": "197fb9f9c83c1e75c4887f6a243521a7703095623614f250b040484d481cbcb8",
-      "bytes": 8207,
+      "sha256": "70ae5eb13e8a2cc26eeec0a794b04831fc138947684cf20a8b947b475e04a783",
+      "bytes": 1322,
       "downloadUrl": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/320c819da84048d5a3066e2578bfa83be9019fdf/svg/microsoft-onedrive.svg",
       "provider": "dashboard-icons",
       "version": null,
@@ -566,7 +571,9 @@
       "guidelines": null,
       "note": null,
       "originalSha256": "197fb9f9c83c1e75c4887f6a243521a7703095623614f250b040484d481cbcb8",
-      "modifications": []
+      "modifications": [
+        "单色适配：移除渐变与重复高光路径，将三个原始云形轮廓统一为黑色；路径几何不变。"
+      ]
     },
     {
       "id": "mega",
@@ -612,8 +619,8 @@
       "id": "microsoft-365",
       "name": "Microsoft 365",
       "path": "assets/brands/microsoft-365.svg",
-      "sha256": "40521c746de4fc4420c6e7ff8bd8fdb60ea2989e56974e6049fb452254ff437b",
-      "bytes": 3208,
+      "sha256": "bf64e75fcce5a859df84163c9a300c7f24e81ff9ffcf252297d0cfe8edf0bb17",
+      "bytes": 760,
       "downloadUrl": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/320c819da84048d5a3066e2578bfa83be9019fdf/svg/microsoft-365.svg",
       "provider": "dashboard-icons",
       "version": null,
@@ -626,7 +633,9 @@
       "guidelines": null,
       "note": null,
       "originalSha256": "40521c746de4fc4420c6e7ff8bd8fdb60ea2989e56974e6049fb452254ff437b",
-      "modifications": []
+      "modifications": [
+        "单色适配：移除渐变与重复光影路径，将三个原始轮廓统一为黑色；路径几何不变。"
+      ]
     },
     {
       "id": "notion",
@@ -752,8 +761,8 @@
       "id": "playstation-plus",
       "name": "PlayStation Plus",
       "path": "assets/brands/playstation-plus.svg",
-      "sha256": "d3d6713078afbb937da47f1b7903f6c5d32577a0dd68b8c1a0c1ed3b15f792d5",
-      "bytes": 4010,
+      "sha256": "d655d21255fccf3627e0a2d2606ae7e15fa4095a8f8b8b58b5c726712e8f0dcb",
+      "bytes": 2154,
       "downloadUrl": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/320c819da84048d5a3066e2578bfa83be9019fdf/svg/playstation-plus.svg",
       "provider": "dashboard-icons",
       "version": null,
@@ -766,14 +775,16 @@
       "guidelines": null,
       "note": null,
       "originalSha256": "d3d6713078afbb937da47f1b7903f6c5d32577a0dd68b8c1a0c1ed3b15f792d5",
-      "modifications": []
+      "modifications": [
+        "单色适配：移除渐变及立体投影层，使用原加号与四个按键符号路径组成 evenodd 镂空，保留原坐标与变换。"
+      ]
     },
     {
       "id": "xbox-game-pass",
       "name": "Xbox Game Pass",
       "path": "assets/brands/xbox-game-pass.svg",
-      "sha256": "b62020cab3d5b49edb892cc9ad4dc47a0983e5d533dac29b6805c87b98642088",
-      "bytes": 2810,
+      "sha256": "1cb09319883511ce0c22a4ef0ec590f5e37485da0579a64f7f9da5a7d5b8711c",
+      "bytes": 2617,
       "downloadUrl": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/320c819da84048d5a3066e2578bfa83be9019fdf/svg/xbox-game-pass.svg",
       "provider": "dashboard-icons",
       "version": null,
@@ -786,7 +797,9 @@
       "guidelines": null,
       "note": null,
       "originalSha256": "b62020cab3d5b49edb892cc9ad4dc47a0983e5d533dac29b6805c87b98642088",
-      "modifications": []
+      "modifications": [
+        "单色适配：移除绿色方形背景，将原 Xbox 标志与 Game Pass 文字路径设为黑色；路径几何不变。"
+      ]
     },
     {
       "id": "figma",
@@ -812,8 +825,8 @@
       "id": "adobe",
       "name": "Adobe",
       "path": "assets/brands/adobe.svg",
-      "sha256": "c27280899abed89c01aac44352c050fc214030d26ab9bac7dd29a82ac5b968b6",
-      "bytes": 290,
+      "sha256": "9202ebdfc6972c32816812911edc39539ef2eb6483a88cb74dc1af9089cf1421",
+      "bytes": 183,
       "downloadUrl": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/320c819da84048d5a3066e2578bfa83be9019fdf/svg/adobe.svg",
       "provider": "dashboard-icons",
       "version": null,
@@ -826,7 +839,9 @@
       "guidelines": null,
       "note": "目录名称为 Adobe；显示 Adobe 品牌标志，未将其标为某一单独应用图标。",
       "originalSha256": "c27280899abed89c01aac44352c050fc214030d26ab9bac7dd29a82ac5b968b6",
-      "modifications": []
+      "modifications": [
+        "单色适配：移除内嵌颜色样式，将原 Adobe 路径设为黑色；路径几何不变。"
+      ]
     },
     {
       "id": "sketch",
