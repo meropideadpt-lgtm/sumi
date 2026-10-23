@@ -10,6 +10,7 @@ function sumiIcon(name) {
     close:'<path d="m6 6 12 12M18 6 6 18"/>',
     'chevron-left':'<path d="m15 5-7 7 7 7"/>',
     'chevron-right':'<path d="m9 5 7 7-7 7"/>',
+    'chevron-down':'<path d="m5 9 7 7 7-7"/>',
     bell:'<path d="M5 9a7 7 0 0 1 14 0v5l2 3H3l2-3Z"/><path d="M9 21h6"/>',
     upload:'<path d="M12 16V3m-5 5 5-5 5 5M4 15v5h16v-5"/>',
     image:'<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 3-3 6 6"/>',

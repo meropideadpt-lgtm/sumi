@@ -20,6 +20,57 @@ const nav=[['home','home'],['list','list'],['stats','stats'],['calendar','calend
 const categoryValues=['未分类','影音娱乐','音乐音频','AI 工具','工作效率','办公效率','云存储','游戏','设计','学习教育','开发工具','生活服务','其他'];
 function setCategoryInput(value){const input=$('#category');if(!input)return;input.value=SumiI18n.category(value);input.dataset.originalCategory=value;input.dataset.originalLabel=input.value}
 function readCategoryInput(){const input=$('#category'),value=input.value.trim();if(value===input.dataset.originalLabel)return input.dataset.originalCategory;return categoryValues.find(item=>SumiI18n.category(item)===value)||value||'未分类'}
+function categoryPickerHtml(category,label){
+  return `<div class="field category-field"><label for="category">${tx('category')}</label><div class="category-control"><input id="category" maxlength="30" value="${esc(label)}" data-original-category="${esc(category)}" data-original-label="${esc(label)}" autocomplete="off" role="combobox" aria-autocomplete="none" aria-haspopup="listbox" aria-controls="categoryOptions" aria-expanded="false" aria-describedby="categoryHint"><button id="categoryToggle" type="button" aria-label="${tx('chooseCategory')}" aria-controls="categoryOptions" aria-expanded="false">${sumiIcon('chevron-down')}</button></div><div id="categoryOptions" class="category-options" role="listbox" aria-label="${tx('presetCategories')}" hidden>${categoryValues.map((value,index)=>`<button id="category-option-${index}" type="button" tabindex="-1" role="option" data-category="${esc(value)}" aria-selected="${value===category?'true':'false'}">${esc(SumiI18n.category(value))}</button>`).join('')}</div><p id="categoryHint" class="small category-hint">${tx('categoryHint')}</p></div>`;
+}
+function bindCategoryPicker(){
+  const input=$('#category'),toggle=$('#categoryToggle'),list=$('#categoryOptions'),field=input?.closest('.category-field');
+  if(!input||!toggle||!list||!field)return;
+  const options=[...list.querySelectorAll('[data-category]')];let index=-1,composing=false;
+  const highlight=()=>{
+    options.forEach((option,i)=>{option.classList.toggle('is-active',i===index);option.setAttribute('aria-selected',String(i===index))});
+    if(!list.hidden&&index>=0)input.setAttribute('aria-activedescendant',options[index].id);else input.removeAttribute('aria-activedescendant');
+  };
+  const close=()=>{list.hidden=true;input.setAttribute('aria-expanded','false');toggle.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant')};
+  const open=()=>{
+    // Always show every preset, including when the current value is Uncategorized.
+    index=options.findIndex(option=>option.dataset.category===readCategoryInput());
+    list.hidden=false;input.setAttribute('aria-expanded','true');toggle.setAttribute('aria-expanded','true');highlight();
+  };
+  const choose=option=>{
+    setCategoryInput(option.dataset.category);close();
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+  };
+  input.addEventListener('click',open);
+  toggle.addEventListener('click',()=>{if(list.hidden)open();else close()});
+  // Focus alone never opens the list, so selecting an option cannot reopen it.
+  // Collapse this in-flow list after click activation, not between pointerdown
+  // and click, which would move the Save button out from under a touch.
+  $('#modalOverlay')?.addEventListener('click',event=>{if(!field.contains(event.target))close()});
+  input.addEventListener('compositionstart',()=>{composing=true});
+  input.addEventListener('compositionend',()=>{composing=false});
+  input.addEventListener('input',()=>{if(!list.hidden){index=options.findIndex(option=>option.dataset.category===readCategoryInput());highlight()}});
+  const onKey=event=>{
+    if(composing||event.isComposing){if(['Enter','Escape'].includes(event.key))event.stopPropagation();return}
+    const focusedOption=options.indexOf(event.target.closest('[data-category]'));
+    if(focusedOption>=0)index=focusedOption;
+    if(event.key==='Escape'&&!list.hidden){event.preventDefault();event.stopPropagation();close();return}
+    if(event.key==='Tab'){close();return}
+    if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+      event.preventDefault();if(list.hidden){open();if(index<0)index=event.key==='ArrowDown'?0:options.length-1}
+      else if(index<0)index=event.key==='ArrowDown'?0:options.length-1;
+      else index=(index+(event.key==='ArrowDown'?1:-1)+options.length)%options.length;
+      highlight();if(focusedOption>=0)options[index].focus({preventScroll:true});options[index].scrollIntoView({block:'nearest'});return;
+    }
+    if(event.key==='Enter'&&!list.hidden){event.preventDefault();if(index>=0)choose(options[index]);else close()}
+  };
+  field.addEventListener('keydown',onKey);
+  options.forEach(option=>{
+    // Mouse selection keeps the editing caret; touch keeps native scrolling.
+    option.addEventListener('pointerdown',event=>{if(event.pointerType==='mouse')event.preventDefault()});
+    option.addEventListener('click',()=>choose(option));
+  });
+}
 function render(){
   fxRenderPending=false;
   SumiI18n.setLanguage(preferences.language);document.documentElement.lang=SumiI18n.getLanguage();SumiTheme.apply(preferences.theme);SumiMotion.apply(preferences.motion);
@@ -95,11 +146,11 @@ function refreshPwaPanel(){
   panel.outerHTML=SumiPWA.settingsMarkup();SumiPWA.bind();
   if(focusId)document.getElementById(focusId)?.focus({preventScroll:true});
 }
-function nativePickerFocused(){return document.activeElement?.matches('select,input[list],input[type="date"],input[type="month"]')}
+function nativePickerFocused(){return $('#categoryOptions')?.hidden===false||document.activeElement?.matches('select,input[list],input[type="date"],input[type="month"],#category,#categoryToggle,[data-category]')}
 function modalHtml(){
   const s=formDraft||(modal==='new'?{name:'',amount:'',currency:'CNY',months:1,nextDate:today(),status:'active',autoRenew:true,logo:''}:data.subscriptions.find(x=>x.id===modal));if(!s)return '';
   const category=s.category||'未分类',categoryLabel=SumiI18n.category(category);
-  return `<div class="overlay" id="modalOverlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="subscriptionTitle"><div class="modal-head"><h2 id="subscriptionTitle">${tx(modal==='new'?'addSubscription':'editSubscription')}</h2><button class="iconbtn" data-close aria-label="${tx('closeSubscription')}">${sumiIcon('close')}</button></div><form id="subscriptionForm"><div class="form-grid"><div><label class="small">${tx('logo')}</label><button class="logo-picker" type="button" id="openPicker" aria-label="${tx('changeLogo')}">${logoMarkup(s.name,s.logo)}</button></div><div class="field service-autocomplete"><label for="name">${tx('subscriptionName')}</label><input id="name" required maxlength="70" value="${esc(s.name)}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-controls="suggestions" aria-expanded="false"><div id="suggestions" class="service-suggestions" role="listbox" aria-label="${tx('matchedServices')}" hidden></div></div><div class="field"><label for="formCurrency">${tx('originalCurrency')}</label><select id="formCurrency">${currencyOptions(s.currency)}</select></div><div class="field" style="grid-column:2"><label for="nextDate">${tx('nextRenewal')}</label><input id="nextDate" type="date" min="0001-01-01" max="9999-12-31" required value="${esc(s.nextDate)}"></div><div class="field"><label for="amount">${tx('amount')}</label><input id="amount" type="number" required min="0" step="0.01" value="${esc(s.amount)}"></div><div class="field" style="grid-column:2"><label for="months">${tx('cycle')}</label><select id="months">${[1,3,6,12].map(n=>`<option value="${n}" ${Number(s.months)===n?'selected':''}>${tx('months',{count:numberText(n)})}</option>`).join('')}</select></div><div class="field"><label for="status">${tx('subscriptionStatus')}</label><select id="status"><option value="active" ${active(s)?'selected':''}>${tx('active')}</option><option value="cancelled" ${!active(s)?'selected':''}>${tx('cancelled')}</option></select></div><div class="field" style="grid-column:2"><label for="autoRenew">${tx('autoRenew')}</label><select id="autoRenew"><option value="true" ${s.autoRenew?'selected':''}>${tx('on')}</option><option value="false" ${!s.autoRenew?'selected':''}>${tx('off')}</option></select></div></div><div class="field category-field"><label for="category">${tx('category')}</label><input id="category" maxlength="30" value="${esc(categoryLabel)}" data-original-category="${esc(category)}" data-original-label="${esc(categoryLabel)}" list="categoryOptions"><datalist id="categoryOptions">${categoryValues.map(value=>`<option value="${esc(SumiI18n.category(value))}"></option>`).join('')}</datalist></div><div class="modal-actions"><button class="secondary" type="button" data-close>${tx('cancel')}</button><button class="primary" type="submit">${tx(modal==='new'?'add':'saveChanges')}</button></div></form></div></div>`;
+  return `<div class="overlay" id="modalOverlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="subscriptionTitle"><div class="modal-head"><h2 id="subscriptionTitle">${tx(modal==='new'?'addSubscription':'editSubscription')}</h2><button class="iconbtn" data-close aria-label="${tx('closeSubscription')}">${sumiIcon('close')}</button></div><form id="subscriptionForm"><div class="form-grid"><div><label class="small">${tx('logo')}</label><button class="logo-picker" type="button" id="openPicker" aria-label="${tx('changeLogo')}">${logoMarkup(s.name,s.logo)}</button></div><div class="field service-autocomplete"><label for="name">${tx('subscriptionName')}</label><input id="name" required maxlength="70" value="${esc(s.name)}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-controls="suggestions" aria-expanded="false"><div id="suggestions" class="service-suggestions" role="listbox" aria-label="${tx('matchedServices')}" hidden></div></div><div class="field currency-field"><label for="formCurrency">${tx('originalCurrency')}</label><select id="formCurrency">${currencyOptions(s.currency)}</select></div><div class="field" style="grid-column:2"><label for="nextDate">${tx('nextRenewal')}</label><input id="nextDate" type="date" min="0001-01-01" max="9999-12-31" required value="${esc(s.nextDate)}"></div><div class="field"><label for="amount">${tx('amount')}</label><input id="amount" type="number" required min="0" step="0.01" value="${esc(s.amount)}"></div><div class="field" style="grid-column:2"><label for="months">${tx('cycle')}</label><select id="months">${[1,3,6,12].map(n=>`<option value="${n}" ${Number(s.months)===n?'selected':''}>${tx('months',{count:numberText(n)})}</option>`).join('')}</select></div><div class="field"><label for="status">${tx('subscriptionStatus')}</label><select id="status"><option value="active" ${active(s)?'selected':''}>${tx('active')}</option><option value="cancelled" ${!active(s)?'selected':''}>${tx('cancelled')}</option></select></div><div class="field" style="grid-column:2"><label for="autoRenew">${tx('autoRenew')}</label><select id="autoRenew"><option value="true" ${s.autoRenew?'selected':''}>${tx('on')}</option><option value="false" ${!s.autoRenew?'selected':''}>${tx('off')}</option></select></div></div>${categoryPickerHtml(category,categoryLabel)}<div class="modal-actions"><button class="secondary" type="button" data-close>${tx('cancel')}</button><button class="primary" type="submit">${tx(modal==='new'?'add':'saveChanges')}</button></div></form></div></div>`;
 }
 function shortDate(value){return value?dateText(value,{month:'short',day:'numeric'}):t('none')}
 function mobileSummary(){
@@ -272,7 +323,7 @@ function refreshFxView(){
 fxState=fxManager.getState();
 function currencyOptions(selected){
   const codes=[...new Set([...commonCurrencies,...Object.keys(fxState.currencies||{}),...data.subscriptions.map(s=>s.currency),...data.payments.map(p=>p.currency),preferences.currency,selected])].filter(code=>/^[A-Z]{3}$/.test(code));
-  return codes.map(code=>`<option value="${code}" ${code===selected?'selected':''}>${code}${SumiFx.supported(code,fxState.snapshot)===false?tx('unsupportedCurrency'):''}</option>`).join('');
+  return codes.map(code=>`<option value="${code}" ${code===selected?'selected':''}>${esc(SumiI18n.currencyLabel(code))}${SumiFx.supported(code,fxState.snapshot)===false?tx('unsupportedCurrency'):''}</option>`).join('');
 }
 function referenceQuote(amount,from,to=preferences.currency){return SumiFx.quote(amount,from,to,fxState.snapshot)}
 function rangeFor(filters){
@@ -424,7 +475,7 @@ function bind(){
     }))return;
     modal=null;formDraft=null;selectedLogo='';render();
   });
-  bindServiceSearch();
+  bindServiceSearch();bindCategoryPicker();
   bindDialogKeys($('#modalOverlay .modal'),closeModal);
   $('#closePicker')?.addEventListener('click',closePicker);
   $('#pickerOverlay')?.addEventListener('click',event=>{if(event.target.id==='pickerOverlay')closePicker()});
