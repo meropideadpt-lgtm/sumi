@@ -202,6 +202,88 @@ class StageSixPWATests(unittest.TestCase):
         expect(self.page.locator('#suggestions')).to_be_visible()
         self.assertTrue(self.page.locator('#suggestions img').first.evaluate('(img)=>img.complete && img.naturalWidth>0'))
 
+    def test_offline_monochrome_catalog_tracks_theme_without_mutating_custom_logos(self):
+        self.open()
+        # Seed both supported custom formats; image pixels and business records
+        # must survive appearance changes and an offline restart unchanged.
+        custom = self.page.evaluate('''async () => {
+            const canvas=document.createElement('canvas');canvas.width=canvas.height=24;
+            const ctx=canvas.getContext('2d');ctx.fillStyle='#e52b38';ctx.fillRect(0,0,24,24);
+            ctx.fillStyle='#315be8';ctx.fillRect(0,0,12,12);
+            const source=canvas.toDataURL('image/png'),ref=await SumiLogoStore.save(source);
+            const saved=JSON.parse(localStorage.getItem('sumi-data-v1'));
+            saved.subscriptions[1].logo=ref;
+            saved.subscriptions.push({...saved.subscriptions[1],id:'legacy-custom',
+                name:'Legacy custom image',logo:source});
+            localStorage.setItem('sumi-data-v1',JSON.stringify(saved));
+            return {source,ref};
+        }''')
+        self.assertTrue(custom['ref'].startswith('sumi-logo:'))
+        self.page.reload()
+        self.page.wait_for_function('SumiPWA.getState().ready')
+        before = self.raw()
+        self.go_offline()
+        self.page.reload()
+
+        def assert_appearance(selector, dark):
+            images=self.page.locator(selector)
+            self.assertGreater(images.count(),0)
+            images.evaluate_all('(images)=>Promise.all(images.map(image=>image.decode()))')
+            for style in images.evaluate_all('''images=>images.map(image=>({
+                loaded:image.complete&&image.naturalWidth>0,
+                filter:getComputedStyle(image).filter,
+                background:getComputedStyle(image).backgroundColor
+            }))'''):
+                self.assertTrue(style['loaded'])
+                self.assertEqual(style['filter'],'brightness(0) invert(1)' if dark else 'brightness(0)')
+                self.assertEqual(style['background'],'rgba(0, 0, 0, 0)')
+
+        for appearance in ('light','dark','system'):
+            with self.subTest(appearance=appearance):
+                self.page.emulate_media(color_scheme='light')
+                self.settings()
+                self.page.locator('#theme').select_option(appearance)
+                dark=appearance=='dark'
+                expect(self.page.locator('html')).to_have_attribute('data-theme','dark' if dark else 'light')
+                self.page.locator('[data-nav=home]').click()
+                assert_appearance('.table img.builtin',dark)
+                for subscription_id in ('music','legacy-custom'):
+                    image=self.page.locator(f'tr[data-detail="{subscription_id}"] img.logo')
+                    expect(image).to_have_attribute('src',custom['source'])
+                    image.evaluate('image=>image.decode()')
+                    self.assertEqual(image.evaluate('image=>getComputedStyle(image).filter'),'none')
+                    self.assertFalse(image.evaluate("image=>image.classList.contains('builtin')"))
+                self.page.locator('[data-add]').click()
+                self.page.locator('#name').fill('github')
+                expect(self.page.locator('#suggestions')).to_be_visible()
+                assert_appearance('#suggestions img.builtin',dark)
+                self.page.locator('#name').press('Escape')
+                self.page.locator('#openPicker').click()
+                expect(self.page.locator('#pickerResults [data-pick]')).to_have_count(72)
+                expect(self.page.locator('#pickerResults img.builtin')).to_have_count(55)
+                expect(self.page.locator('#pickerResults .logo.fallback')).to_have_count(17)
+                expect(self.page.locator('#pickerResults .logo.fallback svg')).to_have_count(17)
+                assert_appearance('#pickerResults img.builtin',dark)
+                if appearance=='system':
+                    self.page.emulate_media(color_scheme='dark')
+                    expect(self.page.locator('html')).to_have_attribute('data-theme','dark')
+                    assert_appearance('#pickerResults img.builtin',True)
+                    self.page.emulate_media(color_scheme='light')
+                    expect(self.page.locator('html')).to_have_attribute('data-theme','light')
+                    assert_appearance('#pickerResults img.builtin',False)
+                self.page.locator('#closePicker').click()
+                self.page.locator('[data-close]').first.click()
+                self.assertEqual(self.raw()[0],before[0])
+                self.assertEqual(self.raw()[2],before[2])
+                self.assertEqual(self.page.evaluate('ref=>SumiLogoStore.resolve(ref)',custom['ref']),custom['source'])
+
+        self.page.reload()
+        self.page.wait_for_function('SumiPWA.getState().ready')
+        self.assertEqual(self.raw()[0],before[0])
+        self.assertEqual(self.raw()[2],before[2])
+        self.assertTrue(self.page.evaluate('SumiPWA.getState().offline'))
+        self.assertEqual(self.page.evaluate('ref=>SumiLogoStore.resolve(ref)',custom['ref']),custom['source'])
+
     def test_offline_add_payment_and_reload_remain_usable(self):
         self.open()
         self.go_offline()

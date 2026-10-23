@@ -101,6 +101,10 @@ def capture(folder):
             assert page.locator('[data-chart=annual] .stats-bar').count()==3
             assert page.locator('.stats-payments .payment').count()==4
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            # Filter updates preserve controls and scroll. Capture a fixed origin
+            # so sticky navigation is not positioned by the preceding pointer action.
+            page.mouse.move(0,0)
+            page.evaluate('window.scrollTo(0,0)')
             page.screenshot(path=folder/f'{name}-stats-history.png',full_page=True,animations='disabled')
             page.context.close()
         for name, size in SIZES.items():
@@ -134,6 +138,7 @@ def capture(folder):
             page.clock.run_for(350)
             page.wait_for_function("Array.from(document.querySelectorAll('img.logo')).every(image=>image.complete&&image.naturalWidth>0)")
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            page.evaluate('window.scrollTo(0,0)')
             page.screenshot(path=folder/filename,full_page=True,animations='disabled')
         def full_statistics(page):
             page.locator('[data-nav=stats]').click()
@@ -141,6 +146,7 @@ def capture(folder):
             page.locator('#statsStart').fill('2024-01-01')
             page.locator('#statsEnd').fill('2026-10-22')
             page.locator('#statsFilters [type=submit]').click()
+            page.mouse.move(0,0)
             assert page.locator('[data-chart=monthly] .stats-bar').count()>12
             assert page.locator('[data-chart=annual] .stats-bar').count()==3
         page=h.page(SIZES['desktop'],appearance_data,dark_prefs)

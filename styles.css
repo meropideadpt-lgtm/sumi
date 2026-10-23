@@ -260,7 +260,7 @@ html[data-theme=dark] .iconbtn:hover{background:var(--dark-hover);border-radius:
 html[data-theme=dark] :is(.reminders,.detail-price,.logo-picker,.storage-notice,.stats-explanation,.fx-panel,.pwa-panel,.picker-current){background:var(--dark-raised);border-color:var(--dark-border)}
 html[data-theme=dark] :is(.notice,.stats-explanation){color:#b8d1f3}
 html[data-theme=dark] .logo-picker{border-color:#819ab8}
-/* Keep authentic black and colored brand marks on a neutral light tile. */
+/* Custom uploads keep their original colors on a neutral light tile. */
 html[data-theme=dark] img.logo{background:#f3f6fb}
 html[data-theme=dark] .logo.fallback{background:#2e3e53;color:#c0d0e4}
 html[data-theme=dark] .logo-modal .pick-item[aria-pressed=true]{background:var(--dark-hover);border-color:#9abbe5}
@@ -314,6 +314,13 @@ html:not([data-theme=dark]) .tag.failed{color:#945f5f}
 html:not([data-theme=dark]) :is(.stats-filter-error,.logo-error){color:#945f5f}
 html:not([data-theme=dark]) [data-delete]{color:#945f5f!important}
 html:not([data-theme=dark]) .logo.fallback{color:#6c7e96}
+
+/* Built-in marks are flat silhouettes; only these exact catalog assets invert.
+   Custom images (including existing inline/IndexedDB uploads) stay untouched. */
+html .logo.builtin{background:transparent;filter:brightness(0)}
+html[data-theme=dark] .logo.builtin{background:transparent;filter:brightness(0) invert(1)}
+html:not([data-theme=dark]) .logo.fallback{background:transparent;color:#182238}
+html[data-theme=dark] .logo.fallback{background:transparent;color:#e7ecf5}
 html:not([data-theme=dark]) input::placeholder{color:#637187;opacity:1}
 html:not([data-theme=dark]) :is(button,input,select):focus-visible{outline:2px solid #557fb4;outline-offset:3px}
 /* Stage six: one quiet motion rhythm; state changes do not replay on every render. */

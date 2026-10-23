@@ -460,6 +460,7 @@ class StageSixTests(unittest.TestCase):
         self.navigate('list')
         expect(self.page.locator('.main')).to_have_class(re.compile(r'sumi-enter-view'))
         self.assertGreater(float(self.page.locator('.main').evaluate('el=>getComputedStyle(el).animationDuration').removesuffix('s')), 0)
+        self.navigate('home')
         self.open_form('Unchanged draft', '29')
         expect(self.page.locator('#modalOverlay')).to_have_class(re.compile(r'sumi-enter-overlay'))
         self.page.evaluate('fxManager.refresh({force:true})')
