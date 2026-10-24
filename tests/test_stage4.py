@@ -563,6 +563,7 @@ class StageFourTests(unittest.TestCase):
         context.route('https://api.frankfurter.dev/v1/**',fx)
         context.route('https://cdn.simpleicons.org/**',lambda route:route.abort())
         self.page=self.attach(context.new_page())
+        self.page.add_init_script("localStorage.setItem('sumi-workspace-choice-v1',JSON.stringify({version:1,mode:'guest'}));")
         self.page.clock.install(time=datetime(2026,10,21,16,tzinfo=timezone.utc))
         self.page.goto(self.h.url)
         self.page.wait_for_function('!fxManager.getState().loading')

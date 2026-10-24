@@ -225,6 +225,7 @@ class NativeSelectTests(unittest.TestCase):
                 context=self.h.browser.new_context(viewport={'width':size[0],'height':size[1]},has_touch=True,is_mobile=True)
                 context.route('https://api.frankfurter.dev/v1/**',lambda route:route.fulfill(status=200,content_type='application/json',body=json.dumps(FX_CURRENCIES if route.request.url.endswith('/currencies') else FX_LATEST)))
                 page=context.new_page();self.track(page);self.page=page
+                page.add_init_script("localStorage.setItem('sumi-workspace-choice-v1',JSON.stringify({version:1,mode:'guest'}));")
                 page.goto(self.h.url);page.wait_for_function('!fxManager.getState().loading')
                 page.locator('[data-nav=settings]').tap()
                 self.watch('#language')

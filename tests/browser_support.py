@@ -40,7 +40,7 @@ class Harness:
         self.browser = self.pw.chromium.launch(executable_path=executable, headless=True)
         return self
 
-    def page(self, size=(1440, 1000), data=None, prefs=None, init=None, fx=None):
+    def page(self, size=(1440, 1000), data=None, prefs=None, init=None, fx=None, guest=True):
         context = self.browser.new_context(viewport={'width': size[0], 'height': size[1]}, timezone_id='Asia/Shanghai', locale='zh-CN', device_scale_factor=1, service_workers='block')
         context.route('https://cdn.simpleicons.org/**', lambda route: route.abort())
         fx_requests = []
@@ -63,15 +63,21 @@ class Harness:
         page = context.new_page()
         page.fx_requests = fx_requests
         page.clock.install(time=datetime(2026,10,21,16,tzinfo=timezone.utc))  # 2026-10-22 00:00 Asia/Shanghai
+        if guest:
+            page.add_init_script("try{if(!localStorage.getItem('sumi-workspace-choice-v1'))localStorage.setItem('sumi-workspace-choice-v1',JSON.stringify({version:1,mode:'guest'}))}catch{}")
         if init:
             page.add_init_script(init)
         page.goto(self.url)
+        if guest and page.locator('#auth-guest').is_visible():
+            page.locator('#auth-guest').click()
         if data is not None or prefs is not None:
             page.evaluate('''({data,prefs}) => {
                 if(data!==null)localStorage.setItem('sumi-data-v1',JSON.stringify(data));
                 if(prefs!==null)localStorage.setItem('sumi-prefs-v1',JSON.stringify(prefs));
             }''', {'data': data, 'prefs': prefs})
             page.reload()
+        if guest:
+            page.wait_for_function("typeof data!=='undefined'")
         page.wait_for_function("typeof fxManager==='undefined'||!fxManager.getState().loading")
         return page
 

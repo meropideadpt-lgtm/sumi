@@ -29,7 +29,7 @@ const SumiLogoStore = (() => {
           if (error) reject(error); else resolve(result);
         };
         const timer = setTimeout(() => finish(new Error('logo-db-timeout')), timeout);
-        try { request = environment.indexedDB.open(DB_NAME, 1); }
+        try { request = environment.indexedDB.open(options.dbName || DB_NAME, 1); }
         catch (error) { finish(error); return; }
         request.onupgradeneeded = () => {
           const db = request.result;
@@ -48,6 +48,7 @@ const SumiLogoStore = (() => {
     }
     async function transaction(mode, run) {
       const db = await open();
+      if (mode === 'readwrite') options.assertWritable?.();
       return new Promise((resolve, reject) => {
         let tx, result, settled = false;
         const finish = error => {

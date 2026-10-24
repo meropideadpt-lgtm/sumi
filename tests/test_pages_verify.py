@@ -82,7 +82,7 @@ class PagesVerifyTests(unittest.TestCase):
         self.assertEqual(before, {path.relative_to(self.site).as_posix():path.read_bytes()
                                  for path in self.site.rglob('*') if path.is_file()})
 
-    def test_real_packaged_release_verifies_all_90_published_resources(self):
+    def test_real_packaged_release_verifies_all_published_resources_including_auth(self):
         files, _ = BUILD.verified_files(ROOT)
         directory = self.site.parent / 'actual-release'
         directory.mkdir()
@@ -97,10 +97,12 @@ class PagesVerifyTests(unittest.TestCase):
             return files[name]
         result = VERIFY.verify_site('https://example.test/sumi/', directory, fetcher=fetch)
         self.assertEqual(result['files'], len(files) - 1)
-        self.assertEqual(result['files'], 90)
+        self.assertEqual(result['files'], 98)
         self.assertEqual(set(calls), set(files) - {'.nojekyll'})
         for name in ('index.html','sw.js','sw-assets.js','manifest.webmanifest',
-                     'locales/pwa.js',*BUILD.BRAND_METADATA):
+                     'locales/pwa.js','auth-config.js','workspace.js','auth.js',
+                     'access.js','locales/auth.js','supabase-sdk.js',
+                     *BUILD.BRAND_METADATA,*BUILD.SDK_METADATA):
             self.assertIn(name,calls)
 
     def test_transient_missing_and_stale_files_retry_without_refetching_successes(self):
