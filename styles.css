@@ -406,3 +406,23 @@ html[data-theme=dark] .category-control #categoryToggle:hover,html[data-theme=da
 .form-grid>.service-autocomplete{grid-column:2/-1}
 .form-grid>.currency-field{grid-column:1/-1}
 .settings-row #currency{width:min(100%,360px);max-width:none}
+
+/* Private sign-in shell uses the same typography, small borders and theme palette. */
+.access-visible{background:#fff}
+.access-screen{min-height:100vh;min-height:100dvh;background:#fff;display:flex;flex-direction:column;align-items:center;padding:24px max(20px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom));color:#243147}
+.access-preferences{align-self:flex-end;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;max-width:100%}
+.access-preferences select{min-height:44px;max-width:100%;font-size:14px;padding:8px;border:1px solid #e5eaf3;border-radius:8px;background:transparent;color:inherit}
+.access-card{width:min(360px,100%);margin:auto;padding:48px 0 32px}
+.access-brand{font-size:44px;font-weight:750;letter-spacing:-2.5px;color:inherit;margin-bottom:24px}
+.access-card h1{font-size:21px;line-height:1.4;margin:0 0 12px;font-weight:650}
+.access-note,.access-status{font-size:13px;line-height:1.7;color:#637187;overflow-wrap:anywhere}
+.access-note{margin-bottom:28px}.access-card .field{margin-bottom:18px}.access-card input{min-height:48px;font-size:16px}
+.access-submit{width:100%;min-height:48px;margin-top:5px}.access-footer{text-align:center;padding:22px 0 0;max-width:100%}.access-footer button{min-height:44px;white-space:normal}
+.access-error{font-size:13px;line-height:1.7;color:#a53838;overflow-wrap:anywhere}
+.access-locked{position:fixed;inset:0;z-index:50;overflow:auto}.account-panel{border-top:1px solid #e5eaf3;margin-top:22px;padding-top:4px}.account-panel .settings-row{border:0;flex-wrap:wrap}.account-email{overflow-wrap:anywhere;margin-bottom:0}.account-panel .settings-row>div{min-width:0;max-width:100%}
+html[data-theme=dark] .access-screen,html[data-theme=dark] .access-visible{background:#141a23;color:#e7edf6}
+html[data-theme=dark] .access-note,html[data-theme=dark] .access-status{color:#a4b1c4}html[data-theme=dark] .access-error{color:#f09e9e}
+html[data-theme=dark] .access-preferences select,html[data-theme=dark] .account-panel{border-color:#344154}
+@media(max-width:420px){.access-screen{padding-top:16px}.access-card{padding-top:32px}.access-preferences select{font-size:16px}}
+
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}

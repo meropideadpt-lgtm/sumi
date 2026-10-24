@@ -8,7 +8,7 @@ const SumiMotion = (() => {
   let observedTheme = root?.dataset.theme, themeFrame = 0;
   const frame = globalThis.requestAnimationFrame?.bind(globalThis) || (callback => globalThis.setTimeout?.(callback, 0));
   try {
-    const saved = JSON.parse(globalThis.localStorage?.getItem('sumi-prefs-v1') || 'null');
+    const saved = JSON.parse(globalThis.localStorage?.getItem(globalThis.SumiWorkspace?.preferenceKey() || 'sumi-prefs-v1') || 'null');
     if (saved?.motion === 'reduce') mode = 'reduce';
   } catch { /* Storage recovery belongs to the data store; motion stays usable. */ }
   try { media = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)') || null; }

@@ -4,9 +4,10 @@ import argparse
 import copy
 from PIL import Image, ImageChops
 from browser_support import Harness, FIXTURE, PREFS, SIZES
+from auth_support import AuthSite
 
 ROOT = Path(__file__).resolve().parent
-BASELINE_COUNT = 50
+BASELINE_COUNT = 60
 
 def statistics_history_fixture():
     """Synthetic observed plans and successful payments, never live financial data."""
@@ -194,6 +195,24 @@ def capture(folder):
             page.mouse.move(0,0)
             capture_appearance(page,f'{device}-{language}-{theme}-category-picker.png')
             page.context.close()
+
+        # Login screenshots use the official SDK against a deterministic Auth
+        # stub. No real account or production project is contacted.
+        for language,device in [('zh-CN','desktop'),('zh-TW','phone'),('ja-JP','ipad'),('en','phone')]:
+            for theme in ('light','dark'):
+                site=AuthSite(h,language=language,theme=theme,size=SIZES[device])
+                site.page.locator('[data-auth-status]').wait_for(state='hidden')
+                capture_appearance(site.page,f'{device}-{language}-{theme}-login.png')
+                assert not site.errors
+                site.close()
+        for language,device,theme in [('en','desktop','light'),('ja-JP','ipad','dark')]:
+            site=AuthSite(h,size=SIZES[device])
+            site.login();site.page.locator('[data-nav=settings]').click()
+            site.page.locator('#language').select_option(language)
+            site.page.locator('#theme').select_option(theme)
+            capture_appearance(site.page,f'{device}-{language}-{theme}-account-settings.png')
+            assert not site.errors
+            site.close()
 
 def compare(expected, actual):
     failures = []

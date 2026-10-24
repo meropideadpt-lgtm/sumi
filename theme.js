@@ -5,7 +5,7 @@ const SumiTheme = (() => {
   let mode = 'light';
   let media = null;
   try {
-    const saved = JSON.parse(globalThis.localStorage?.getItem('sumi-prefs-v1') || 'null');
+    const saved = JSON.parse(globalThis.localStorage?.getItem(globalThis.SumiWorkspace?.preferenceKey() || 'sumi-prefs-v1') || 'null');
     if (saved && typeof saved === 'object' && modes.includes(saved.theme)) mode = saved.theme;
   } catch { /* An unreadable preference cannot block the light default or app recovery. */ }
   try {
