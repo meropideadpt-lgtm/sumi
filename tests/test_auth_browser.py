@@ -2,6 +2,7 @@
 No real Supabase account, iPadOS Safari, email or cloud database is exercised.
 """
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 import unittest
 from playwright.sync_api import expect
@@ -25,6 +26,44 @@ class PrivateAuthTests(unittest.TestCase):
     def add(page,name='Private subscription'):
         page.locator('[data-add]').click();page.locator('#name').fill(name);page.locator('#amount').fill('19.25')
         page.locator('#subscriptionForm [type=submit]').click();expect(page.locator('#subscriptionForm')).to_have_count(0)
+
+    def test_published_public_config_connects_sdk_and_preserves_guest_data(self):
+        # Load the committed configuration, but intercept ALL external traffic.
+        # This verifies wiring without sending a password to the real project.
+        target='https://qcboybxjjegdwpbbtbaj.supabase.co'
+        context=self.h.browser.new_context(service_workers='block')
+        self.addCleanup(context.close)
+        context.route('https://**/*',lambda route:route.abort('internetdisconnected'))
+        calls=[]
+        def auth_route(route):
+            calls.append({'url':route.request.url,'apikey':route.request.headers.get('apikey')})
+            route.fulfill(content_type='application/json',body=json.dumps(session()),
+                          headers={'access-control-allow-origin':'*'})
+        context.route(target+'/auth/v1/**',auth_route)
+        original=json.dumps(FIXTURE,ensure_ascii=False,indent=2)
+        context.add_init_script('''if(!localStorage.getItem('sumi-data-v1')){
+            localStorage.setItem('sumi-data-v1',%s);
+        }'''%json.dumps(original))
+        page=context.new_page();errors=[]
+        page.on('pageerror',lambda error:errors.append(str(error)))
+        page.clock.install(time=datetime.fromtimestamp(NOW,timezone.utc))
+        page.goto(self.h.url)
+        config=page.evaluate('SumiAuthConfig')
+        self.assertEqual(config['url'],target)
+        self.assertTrue(config['publishableKey'].startswith('sb_publishable_'))
+        expect(page.locator('#auth-submit')).to_be_enabled()
+        page.locator('#auth-email').fill('config-test@example.test')
+        page.locator('#auth-password').fill('fixture-password-not-a-real-account')
+        page.locator('#auth-submit').click();self.ready(page)
+        self.assertEqual(calls,[{'url':target+'/auth/v1/token?grant_type=password','apikey':config['publishableKey']}])
+        self.assertEqual(page.evaluate('SumiWorkspace.current().project'),target)
+        self.assertEqual(page.evaluate('data.subscriptions.length'),0)
+        self.assertEqual(page.evaluate("localStorage.getItem('sumi-data-v1')"),original)
+        page.locator('[data-nav=settings]').click();page.locator('#accountGuest').click();self.ready(page)
+        self.assertEqual(page.evaluate('SumiWorkspace.current().mode'),'guest')
+        self.assertEqual(page.evaluate('data.subscriptions.length'),len(FIXTURE['subscriptions']))
+        self.assertEqual(page.evaluate("localStorage.getItem('sumi-data-v1')"),original)
+        self.assertEqual(errors,[])
 
     def test_login_uses_sdk_and_restores_session_without_storing_password(self):
         s=self.site();p=s.page;before=s.raw_guest();s.login();self.ready(p)

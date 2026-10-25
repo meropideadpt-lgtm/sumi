@@ -156,6 +156,6 @@ python tests/visual.py --capture tests/baselines
 
 新增 `test_auth.cjs`、`test_auth_browser.py` 和 `auth_support.py`，PWA 回归追加登录壳离线缓存及账号缓存会话离线重开。普通历史回归显式选择访客，继续使用原业务断言；登录专项直接从登录页测试，不能通过通用 guest fixture 绕过认证。
 
-浏览器使用仓库内真实官方 SDK，对 GoTrue 请求使用确定性模拟（虚构项目、用户、密码和令牌）。覆盖会话服务端验证/刷新/撤销、跨标签页、离线退出、存储失败、账号和访客数据/图片隔离及备份不含会话。**没有使用真实 Supabase 项目或真实 iPadOS Safari。**
+浏览器使用仓库内真实官方 SDK，对 GoTrue 请求使用确定性模拟（虚构用户、密码和令牌；多数测试还覆盖为虚构项目）。配置接线测试直接读取仓库的公开配置，拦截所有外部请求并检查 SDK 请求目标、公开 apikey 和旧访客数据保持。覆盖会话服务端验证/刷新/撤销、跨标签页、离线退出、存储失败、账号和访客数据/图片隔离及备份不含会话。**没有使用真实 Supabase 项目或真实 iPadOS Safari。**
 
 运行全部检查前执行 `python scripts/update-pwa-cache.py`；当前清单有 88 个运行时资源。语法检查可用 `for file in *.js locales/*.js; do node --check "$file" || exit 1; done`。视觉基线增加到 60 张：原 50 张中仅 5 张设置页因新增账号面板调整，新增 8 张四语言深浅色登录页及 2 张账号设置页。CI 继续捕获截图供审核，本地另执行基线比较。详细结果与剩余验收见 [第八阶段记录](../docs/stage8-validation.md)。
