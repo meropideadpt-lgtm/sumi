@@ -4,7 +4,7 @@
 
 ## 网页试用与 GitHub Pages
 
-项目是纯静态网页，无需 Node 生产依赖、后端、账号或构建框架，适合 GitHub Pages 的 HTTPS 项目站点。仓库 `meropideadpt-lgtm/sumi` 的默认地址为 `https://meropideadpt-lgtm.github.io/sumi/`；实际是否上线应以 Actions 部署结果及该地址的响应为准。
+项目是纯静态网页，无需 Node 生产依赖或构建框架；本地访客不需要账号，私人登录可选接入 Supabase Auth，适合 GitHub Pages 的 HTTPS 项目站点。仓库 `meropideadpt-lgtm/sumi` 的默认地址为 `https://meropideadpt-lgtm.github.io/sumi/`；实际是否上线应以 Actions 部署结果及该地址的响应为准。
 
 自动部署配置在 `.github/workflows/test.yml`：PR 运行检查；推送 main 或在 Actions 手动运行 main 时，先通过语法、Node、浏览器和截图检查，再由独立 `deploy-pages` 任务发布并逐项核对线上资源。部署只使用 GitHub 内置令牌的 `pages: write` 与 `id-token: write`，无需个人令牌。其他分支和 PR 不部署。
 
@@ -15,6 +15,12 @@
 所有页面脚本、CSS、Logo、语言文件和 Manifest 均使用相对路径，PWA 的 scope/start_url 与 Service Worker 缓存以 `/sumi/` 为边界。首次离线使用前，需成功联网打开并等待设置页显示离线资源准备完成。
 
 试用前请保留完整 JSON 备份。新 Pages 网址与旧预览、本地地址的数据按浏览器来源隔离，不会自动迁移；在原网址导出，再到新网址「设置 → 导入 JSON」即可转移订阅、付款和图片。不同设备仍独立保存，没有云同步。详见 [部署与实机试用](docs/pages-deployment.md)。
+
+## 私人登录（第八阶段）
+
+全屏邮箱密码登录、本地访客入口和设置页退出已实现。官方 Supabase SDK 随站点提供，账号按项目和用户 ID 隔离本机记录，原访客数据及图片保持原位置。四语言与主题可在登录页切换。`auth-config.js` 已填写用户提供的 Supabase 项目 URL 与公开 Publishable Key；真实账号登录及控制台设置仍待验收，本地访客功能不依赖认证服务。
+
+仅有认证，不会自动上传或迁移数据；不同设备的订阅仍独立。控制台关闭注册、手动创建私人账号、填入公开配置和实机验收步骤见 [私人登录](docs/private-auth.md)，未来迁移、版本、离线删除与 RLS 设计见 [同步准备](docs/cloud-sync-design.md)。验证结果见 [第八阶段验收记录](docs/stage8-validation.md)。
 
 ## 当前实现
 

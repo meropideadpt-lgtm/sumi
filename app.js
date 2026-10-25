@@ -6,8 +6,12 @@ const dateText=(value,options)=>SumiI18n.date(value,options),numberText=(value,o
 const t6=(key,params)=>SumiI18n.t('stage6.'+key,params),tx6=(key,params)=>esc(t6(key,params));
 let exporting=false,importing=false,logoStorageWarning=false;
 const errorText=error=>SumiI18n.error(error?.message||error);
-const storage=SumiData.open({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value),removeItem:key=>localStorage.removeItem(key)});
-let data=storage.data,preferences=storage.preferences,view='home',filter='',statusFilter='all',modal=null,detailId=null,picker=false,selectedLogo='',pickerSearch='',calOffset=0,formDraft=null,paymentModal=null,paymentDraft=null,confirming=false,uploadGeneration=0,logoUploading=false,logoError='',suggestionsOpen=false,suggestionIndex=-1,suggestionResults=[],nameComposing=false,pickerComposing=false,fxRenderPending=false,uiReady=false,statsFilters={mode:'year',year:today().slice(0,4),month:today().slice(0,7),start:today().slice(0,4)+'-01-01',end:today(),error:''};
+const workspaceStorage=SumiWorkspace.storage();
+const storage=SumiData.open(workspaceStorage);
+const logoStore=SumiLogoStore.create({dbName:SumiWorkspace.current().dbName,assertWritable:SumiWorkspace.assertWritable});
+const initialPreferences={...storage.preferences};
+try{if(workspaceStorage.getItem('sumi-prefs-v1')===null){initialPreferences.language=SumiI18n.getLanguage();initialPreferences.theme=SumiTheme.getMode()}}catch{/* Existing storage recovery handles unreadable preferences. */}
+let data=storage.data,preferences=initialPreferences,view='home',filter='',statusFilter='all',modal=null,detailId=null,picker=false,selectedLogo='',pickerSearch='',calOffset=0,formDraft=null,paymentModal=null,paymentDraft=null,confirming=false,uploadGeneration=0,logoUploading=false,logoError='',suggestionsOpen=false,suggestionIndex=-1,suggestionResults=[],nameComposing=false,pickerComposing=false,fxRenderPending=false,uiReady=false,statsFilters={mode:'year',year:today().slice(0,4),month:today().slice(0,7),start:today().slice(0,4)+'-01-01',end:today(),error:''};
 const converted=(amount,from,to=preferences.currency)=>referenceQuote(Number(amount),from,to).rawAmount;
 const original=(amount,cur)=>SumiI18n.money(Number(amount),cur,{currencyDisplay:'code',maximumFractionDigits:20});
 const active=s=>s.status!=='cancelled';
@@ -104,7 +108,7 @@ function calendarPage(){
   }
   return `<div class="card"><div class="section-title"><h2>${esc(dateText(month,{year:'numeric',month:'long'}))}</h2><div class="month-switch"><button class="secondary" data-month="-1" aria-label="${tx('previousMonth')}">${sumiIcon('chevron-left')}</button><button class="secondary" data-month="1" aria-label="${tx('nextMonth')}">${sumiIcon('chevron-right')}</button></div></div><div class="calendar-grid">${[5,6,7,8,9,10,11].map(day=>`<div class="small calendar-weekday">${esc(dateText(`2026-01-${String(day).padStart(2,'0')}`,{weekday:'short'}))}</div>`).join('')}${cells.join('')}</div><p class="note">${tx('calendarNote')}</p></div>`;
 }
-function settingsPage(){return `<div class="card"><div class="settings-row"><label for="language">${tx('language')}</label><select class="select" id="language">${[['zh-CN','简体中文'],['zh-TW','繁體中文'],['ja-JP','日本語'],['en','English']].map(([value,label])=>`<option value="${value}" ${preferences.language===value?'selected':''}>${label}</option>`).join('')}</select></div><div class="settings-row"><label for="currency">${tx('displayCurrency')}</label><select class="select" id="currency">${currencyOptions(preferences.currency)}</select></div>${fxPanel()}<div class="settings-row"><label for="theme">${tx('appearance')}</label><select class="select" id="theme">${['light','dark','system'].map(value=>`<option value="${value}" ${preferences.theme===value?'selected':''}>${tx(value)}</option>`).join('')}</select></div><div class="settings-row"><label for="motion">${tx6('motion')}</label><select class="select" id="motion">${['system','reduce'].map(value=>`<option value="${value}" ${(preferences.motion||'system')===value?'selected':''}>${tx6('motion.'+value)}</option>`).join('')}</select></div><div class="settings-row"><label for="reminder">${tx('siteReminder')}</label><select class="select" id="reminder">${[0,1,3,7,14].map(value=>`<option value="${value}" ${Number(preferences.reminder)===value?'selected':''}>${value?tx('daysBefore',{count:numberText(value)}):tx('onDay')}</option>`).join('')}</select></div><div class="settings-row"><label>${tx('backupRestore')}</label><div class="tools"><button class="secondary" id="export">${tx(storage.issues.length?'exportRaw':'exportJSON')}</button><button class="secondary" id="import">${tx('importJSON')}</button><input id="importFile" type="file" accept=".json,application/json" hidden></div></div><p class="note">${tx('backupNote')}</p>${SumiPWA.settingsMarkup()}</div>`}
+function settingsPage(){return `<div class="card"><div class="settings-row"><label for="language">${tx('language')}</label><select class="select" id="language">${[['zh-CN','简体中文'],['zh-TW','繁體中文'],['ja-JP','日本語'],['en','English']].map(([value,label])=>`<option value="${value}" ${preferences.language===value?'selected':''}>${label}</option>`).join('')}</select></div><div class="settings-row"><label for="currency">${tx('displayCurrency')}</label><select class="select" id="currency">${currencyOptions(preferences.currency)}</select></div>${fxPanel()}<div class="settings-row"><label for="theme">${tx('appearance')}</label><select class="select" id="theme">${['light','dark','system'].map(value=>`<option value="${value}" ${preferences.theme===value?'selected':''}>${tx(value)}</option>`).join('')}</select></div><div class="settings-row"><label for="motion">${tx6('motion')}</label><select class="select" id="motion">${['system','reduce'].map(value=>`<option value="${value}" ${(preferences.motion||'system')===value?'selected':''}>${tx6('motion.'+value)}</option>`).join('')}</select></div><div class="settings-row"><label for="reminder">${tx('siteReminder')}</label><select class="select" id="reminder">${[0,1,3,7,14].map(value=>`<option value="${value}" ${Number(preferences.reminder)===value?'selected':''}>${value?tx('daysBefore',{count:numberText(value)}):tx('onDay')}</option>`).join('')}</select></div><div class="settings-row"><label>${tx('backupRestore')}</label><div class="tools"><button class="secondary" id="export">${tx(storage.issues.length?'exportRaw':'exportJSON')}</button><button class="secondary" id="import">${tx('importJSON')}</button><input id="importFile" type="file" accept=".json,application/json" hidden></div></div><p class="note">${tx('backupNote')}</p>${SumiAccess.panelMarkup()}${SumiPWA.settingsMarkup()}</div>`}
 // Native pickers belong to the browser. Keep their attached select and option
 // nodes when a preference changes; recreating and focusing them can reopen iPad pickers.
 function refreshSettingsView(){
@@ -133,7 +137,7 @@ function refreshSettingsView(){
   const notice=main.querySelector('.storage-notice:has(#exportRaw)');
   if(notice){notice.firstChild.textContent=storage.issues.map(issue=>errorText(issue)).join(' ')+' ';$('#exportRaw').textContent=t('exportRaw')}
   if($('#logoStorageNotice'))$('#logoStorageNotice').textContent=t6('missingLogo');
-  refreshFxPanel();refreshPwaPanel();
+  refreshFxPanel();refreshPwaPanel();SumiAccess.refreshPanel();
 }
 function refreshFxPanel(){
   const panel=$('.fx-panel');if(!panel)return;
@@ -305,7 +309,7 @@ function bindDialogKeys(element,close){
 
 const commonCurrencies=['CNY','USD','JPY','HKD','TWD','EUR','GBP','KRW'];
 let fxState={snapshot:null,currencies:{},loading:false,error:null,cacheWarning:null,cacheState:'empty'};
-const fxManager=SumiFx.createManager({storage:{getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)},onChange:state=>{
+const fxManager=SumiFx.createManager({storage:{getItem:key=>workspaceStorage.getItem(key),setItem:(key,value)=>workspaceStorage.setItem(key,value)},onChange:state=>{
   fxState=state;refreshFxView();
 }});
 function refreshFxView(){
@@ -411,7 +415,7 @@ function bindLogos(){
     const fallback=()=>{const el=document.createElement('span');el.className='logo fallback';el.setAttribute('role','img');el.setAttribute('aria-label',t(img.dataset.logoName?'namedNoLogo':'noLogo',{name:img.dataset.logoName}));el.innerHTML=sumiIcon('service');img.replaceWith(el)};
     img.addEventListener('error',fallback,{once:true});
     if(img.dataset.logoRef){
-      SumiLogoStore.resolve(img.dataset.logoRef).then(source=>{if(!img.isConnected)return;if(source)img.src=source;else{logoStorageWarning=true;fallback();showLogoStorageWarning()}}).catch(()=>{if(img.isConnected){logoStorageWarning=true;fallback();showLogoStorageWarning()}});
+      logoStore.resolve(img.dataset.logoRef).then(source=>{if(!img.isConnected)return;if(source)img.src=source;else{logoStorageWarning=true;fallback();showLogoStorageWarning()}}).catch(()=>{if(img.isConnected){logoStorageWarning=true;fallback();showLogoStorageWarning()}});
     }else if(img.complete&&!img.naturalWidth)fallback();
   });
 }
@@ -442,6 +446,7 @@ function bindValidation(){
   });
 }
 function bind(){
+  SumiAccess.bindPanel();
   bindLogos();bindValidation();SumiPWA.bind();
   $('#refreshRates')?.addEventListener('click',()=>fxManager.refresh({force:true}));
   $('#startCostHistory')?.addEventListener('click',()=>{if(updateData(()=>{}))render()});
@@ -496,7 +501,7 @@ function bind(){
     try{
       const compressed=await SumiLogoUpload.read(file);
       if(!pending())return;
-      const result=await SumiLogoStore.save(compressed);
+      const result=await logoStore.save(compressed);
       if(!pending())return;
       logoUploading=false;selectedLogo=result;formDraft.logo=result;picker=false;render();$('#openPicker')?.focus({preventScroll:true});
     }catch(error){if(pending()){logoUploading=false;logoError=error.message||t('imageReadFailure');if($('#uploadLogo'))$('#uploadLogo').value='';pickerFeedback()}}
@@ -564,7 +569,7 @@ function bind(){
     if(exporting)return;exporting=true;event.currentTarget.disabled=true;
     try{
       if(storage.issues.length)downloadJson(storage.rawBackup(),`sumi-recovery-${today()}.json`);
-      else{const savedPreferences=structuredClone(preferences),savedData=structuredClone(data);downloadJson({version:1,data:await SumiLogoStore.hydrateBackup(savedData),preferences:savedPreferences},`sumi-backup-${today()}.json`)}
+      else{const savedPreferences=structuredClone(preferences),savedData=structuredClone(data);downloadJson({version:1,data:await logoStore.hydrateBackup(savedData),preferences:savedPreferences},`sumi-backup-${today()}.json`)}
     }catch(error){alert(errorText(error))}finally{exporting=false;if($('#export'))$('#export').disabled=false}
   });
   $('#import')?.addEventListener('click',()=>$('#importFile').click());
@@ -573,19 +578,20 @@ function bind(){
     try{
       if(file.size>50*1024*1024)throw Error(t('largeBackup'));
       const obj=SumiData.backup(JSON.parse(await file.text()));
-      obj.data=await SumiLogoStore.hydrateBackup(obj.data);
+      obj.data=await logoStore.hydrateBackup(obj.data);
       if(modal||paymentModal||picker||logoUploading)throw Error(t6('importBusy'));
       if(!confirm(t('confirmImport')))return;
       const previousData=data,previousPreferences=preferences;
-      obj.data=await SumiLogoStore.prepareImport(obj.data);
+      obj.data=await logoStore.prepareImport(obj.data);
       if(data!==previousData||preferences!==previousPreferences||modal||paymentModal||picker||logoUploading)throw Error(t6('importBusy'));
       if(commit(obj.data,obj.preferences,true)){resetPickerState();closeSuggestions();picker=false;selectedLogo='';nameComposing=false;modal=null;detailId=null;formDraft=null;paymentModal=null;paymentDraft=null;logoStorageWarning=false;render()}
     }catch(error){alert(t('importFailed',{error:errorText(error)}))}
     finally{importing=false;e.target.value=''}
   });
 }
+SumiAccess.setBusyCheck(()=>Boolean(modal||paymentModal||picker||logoUploading||exporting||importing||confirming));
 render();uiReady=true;fxManager.refresh();
-SumiPWA.start({isBusy:()=>Boolean(modal||paymentModal||picker||logoUploading||exporting||importing||confirming),onChange:refreshPwaPanel});
+SumiPWA.start({isBusy:()=>Boolean(modal||paymentModal||picker||logoUploading||exporting||importing||confirming||SumiAccess.hasDraft()),onChange:refreshPwaPanel});
 // Finish deferred FX presentation after a click or keyboard action completes.
 // A focusout repaint would remove the next button between pointerdown and click.
 // The state/cache is already current; no timers, blur(), or picker reopening is needed.

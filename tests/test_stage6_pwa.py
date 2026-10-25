@@ -13,6 +13,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import time
 from threading import Thread
 import unittest
 
@@ -96,6 +97,7 @@ class StageSixPWATests(unittest.TestCase):
         self.original_data = json.dumps(fixture, ensure_ascii=False, indent=2)
         self.context.add_init_script('''(() => {
             if (!localStorage.getItem('pwa-test-seeded')) {
+                localStorage.setItem('sumi-workspace-choice-v1',JSON.stringify({version:1,mode:'guest'}));
                 localStorage.setItem('sumi-data-v1', %s);
                 localStorage.setItem('sumi-prefs-v1', %s);
                 localStorage.setItem('pwa-test-seeded', 'yes');
@@ -168,6 +170,36 @@ class StageSixPWATests(unittest.TestCase):
         for icon in manifest['icons']:
             self.assertEqual(self.page.evaluate('''async src => (await fetch(new URL(src,location.href))).status''',icon['src']),200)
         self.assertEqual(self.page.evaluate('async()=> (await navigator.serviceWorker.getRegistration()).scope'),self.url)
+
+    def test_private_login_shell_and_guest_entry_are_available_offline_under_subpath(self):
+        self.open();original=self.raw()[0]
+        self.page.evaluate("SumiWorkspace.remember({mode:'login'})")
+        self.page.reload();expect(self.page.locator('#auth-form')).to_be_visible()
+        self.go_offline();self.page.reload();expect(self.page.locator('#auth-form')).to_be_visible()
+        self.assertEqual(self.page.evaluate("async()=> (await fetch('supabase-sdk.js')).status"),200)
+        self.page.locator('#auth-guest').click();expect(self.page.locator('[data-add]')).to_be_visible()
+        self.assertEqual(self.raw()[0],original)
+        self.assertTrue(self.page.evaluate('SumiPWA.getState().offline'))
+
+    def test_cached_account_session_and_its_local_records_reopen_offline(self):
+        from auth_support import URL,KEY,A,session
+        (self.site/'auth-config.js').write_text('globalThis.SumiAuthConfig='+json.dumps({'url':URL,'publishableKey':KEY})+';')
+        subprocess.run(['python',str(self.site/'scripts/update-pwa-cache.py')],cwd=self.site,check=True,capture_output=True)
+        def auth_route(route):
+            if self.offline:return route.abort('internetdisconnected')
+            payload=session(expires=int(time.time())+3600)
+            if '/user' in route.request.url:payload=payload['user']
+            return route.fulfill(content_type='application/json',body=json.dumps(payload),headers={'access-control-allow-origin':'*'})
+        self.context.route(URL+'/auth/v1/**',auth_route)
+        self.open();original=self.raw()[0];self.settings();self.page.locator('#accountSignIn').click()
+        expect(self.page.locator('#auth-form')).to_be_visible()
+        self.page.locator('#auth-email').fill('owner@example.test');self.page.locator('#auth-password').fill('test-password-never-save');self.page.locator('#auth-submit').click()
+        expect(self.page.locator('[data-add]')).to_be_visible();self.assertEqual(self.page.evaluate('SumiWorkspace.current().userId'),A)
+        self.page.locator('[data-add]').click();self.page.locator('#name').fill('Offline account');self.page.locator('#amount').fill('9.50');self.page.locator('#subscriptionForm [type=submit]').click()
+        saved=self.page.evaluate("workspaceStorage.getItem('sumi-data-v1')")
+        self.go_offline();self.page.reload();expect(self.page.locator('[data-add]')).to_be_visible()
+        self.assertEqual(self.page.evaluate("workspaceStorage.getItem('sumi-data-v1')"),saved)
+        self.assertEqual(self.raw()[0],original)
 
     def test_offline_reopen_all_pages_preserves_business_history_preferences_and_fx(self):
         self.open()
