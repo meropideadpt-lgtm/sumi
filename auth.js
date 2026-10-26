@@ -80,7 +80,16 @@ const SumiAuth = (() => {
       emit({status:'signed-out',user:null,error:null});return {ok:true,remotePending:Boolean(remoteError)};
     }
     function pause(){client?.auth.stopAutoRefresh()}
-    return Object.freeze({restore,login,logout,pause,getState:()=>({...state}),configured:Boolean(checked),storageKey});
+    async function syncClient(expectedUserId){
+      if(closed||!checked)throw Error('sync-auth');
+      await restore();
+      if(closed||state.user?.id!==expectedUserId||state.status!=='authenticated')throw Error('sync-auth');
+      // Cached identity is enough for this device's offline workspace, but not
+      // for starting a cloud transfer. Verify it through Auth before using RPC.
+      if(state.verification!=='verified')throw Error('sync-network');
+      return ensureClient();
+    }
+    return Object.freeze({restore,login,logout,pause,syncClient,getState:()=>({...state}),configured:Boolean(checked),storageKey});
   }
   return Object.freeze({configuration,keyFor,errorCode,create});
 })();

@@ -97,11 +97,13 @@ class PagesVerifyTests(unittest.TestCase):
             return files[name]
         result = VERIFY.verify_site('https://example.test/sumi/', directory, fetcher=fetch)
         self.assertEqual(result['files'], len(files) - 1)
-        self.assertEqual(result['files'], 98)
+        self.assertEqual(result['files'], 104)
         self.assertEqual(set(calls), set(files) - {'.nojekyll'})
         for name in ('index.html','sw.js','sw-assets.js','manifest.webmanifest',
                      'locales/pwa.js','auth-config.js','workspace.js','auth.js',
                      'access.js','locales/auth.js','supabase-sdk.js',
+                     'sync-engine.js','sync-transport.js','sync-controller.js',
+                     'sync-lock.js','sync-view.js','locales/sync.js',
                      *BUILD.BRAND_METADATA,*BUILD.SDK_METADATA):
             self.assertIn(name,calls)
 

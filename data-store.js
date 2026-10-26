@@ -170,12 +170,19 @@ const SumiData = (() => {
     if (!object(value) || value.version !== 1) fail('仅支持 version 为 1 的 sumi 备份');
     return {data:records(value.data).data, preferences:preferences(value.preferences)};
   }
-  function open(storage) {
-    let raw = {[STORE]:null, [PREF]:null};
+  function open(storage, options = {}) {
+    // Account sync metadata joins the existing rollback journal. Guest callers
+    // keep the exact two-key path and never create a sync state or outbox.
+    const metadataKey = options.metadataKey === 'sumi-sync-v1' ? options.metadataKey : null;
+    const keys = [STORE, PREF, ...(metadataKey ? [metadataKey] : [])];
+    let raw = Object.fromEntries(keys.map(key => [key,null])), metadata = null;
     let readable = true, blocked = false;
     const issues = [];
+    const assertWritable = () => { if (options.canWrite && !options.canWrite()) fail('sync-other-tab'); };
     const restore = previous => {
-      for (const key of [STORE,PREF]) {
+      for (const key of keys) {
+        // Older interrupted writes have no sidecar. Never erase it on recovery.
+        if (!Object.hasOwn(previous,key)) continue;
         if (storage.getItem(key) === previous[key]) continue;
         if (previous[key] === null) storage.removeItem(key);
         else storage.setItem(key, previous[key]);
@@ -185,12 +192,14 @@ const SumiData = (() => {
       const pending = storage.getItem(JOURNAL);
       if (pending !== null) {
         const previous = JSON.parse(pending);
-        if (!object(previous) || ![STORE,PREF].every(key => previous[key] === null || typeof previous[key] === 'string')) fail('恢复记录无效');
-        raw = {[STORE]:previous[STORE], [PREF]:previous[PREF]};
+        if (!object(previous) || ![STORE,PREF].every(key => previous[key] === null || typeof previous[key] === 'string')
+          || (metadataKey && Object.hasOwn(previous,metadataKey) && previous[metadataKey] !== null && typeof previous[metadataKey] !== 'string')) fail('恢复记录无效');
+        raw = {...raw,...Object.fromEntries(keys.filter(key => Object.hasOwn(previous,key)).map(key => [key,previous[key]]))};
+        assertWritable();
         restore(previous);
         storage.removeItem(JOURNAL);
       }
-      raw = {[STORE]:storage.getItem(STORE), [PREF]:storage.getItem(PREF)};
+      raw = Object.fromEntries(keys.map(key => [key,storage.getItem(key)]));
     } catch {
       readable = false; blocked = true;
       issues.push('无法安全读取本地存储或恢复上次保存。请检查浏览器存储权限后刷新；现有记录不会被覆盖。');
@@ -215,25 +224,47 @@ const SumiData = (() => {
         blocked = true;
         issues.push('本地偏好设置异常，已保留原始内容并暂停写入。请先导出原始数据，再通过完整备份恢复。');
       }
+      if (metadataKey && raw[metadataKey] !== null) {
+        try { metadata = JSON.parse(raw[metadataKey]); if (!object(metadata)) fail('sync-invalid-state'); }
+        catch { blocked = true; issues.push('sync-invalid-state'); }
+      }
     }
     return {
       data, preferences:prefs, issues,
+      snapshot: () => JSON.parse(JSON.stringify({data,preferences:prefs,metadata})),
       rawBackup: () => ({version:1, raw:{...raw}}),
       writePreferences(nextPrefs) { this.write(null, nextPrefs, false, true); },
-      write(nextData, nextPrefs, recovery = false, preferencesOnly = false) {
+      writeSnapshot(nextData, nextPrefs, nextMetadata) {
+        if (!metadataKey) fail('sync-unavailable');
+        this.write(nextData,nextPrefs,false,false,{metadata:nextMetadata,preserveUnchanged:true});
+      },
+      write(nextData, nextPrefs, recovery = false, preferencesOnly = false, extra = null) {
+        assertWritable();
         if (!readable || (blocked && !recovery)) fail(issues.join(' '));
         const p = preferences(nextPrefs);
         // Display preferences must not normalize or reserialize legacy business records.
-        const next = {[STORE]:preferencesOnly ? raw[STORE] : JSON.stringify(records(nextData).data), [PREF]:JSON.stringify(p)};
+        const checkedData = preferencesOnly ? data : records(nextData).data;
+        const keepData = preferencesOnly || (extra?.preserveUnchanged && JSON.stringify(checkedData) === JSON.stringify(data));
+        const keepPrefs = extra?.preserveUnchanged && JSON.stringify(p) === JSON.stringify(prefs);
+        const next = {[STORE]:keepData ? raw[STORE] : JSON.stringify(checkedData), [PREF]:keepPrefs ? raw[PREF] : JSON.stringify(p)};
+        let nextMetadata = metadata;
+        if (metadataKey) {
+          if (extra && Object.hasOwn(extra,'metadata')) nextMetadata = extra.metadata;
+          else if (options.prepareMeta) nextMetadata = options.prepareMeta({data,preferences:prefs,metadata,nextData:checkedData,nextPreferences:p});
+          if (nextMetadata !== null && !object(nextMetadata)) fail('sync-invalid-state');
+          next[metadataKey] = nextMetadata === null ? null : JSON.stringify(nextMetadata);
+        }
         let journalWritten = false;
         try {
-          if (storage.getItem(JOURNAL) !== null || [STORE,PREF].some(key => storage.getItem(key) !== raw[key])) {
+          if (storage.getItem(JOURNAL) !== null || keys.some(key => storage.getItem(key) !== raw[key])) {
             fail('其他页面已修改数据，请刷新后重试。当前输入尚未保存。');
           }
-          if ([STORE,PREF].every(key => next[key] === raw[key])) return;
+          if (keys.every(key => next[key] === raw[key])) return;
           storage.setItem(JOURNAL, JSON.stringify(raw));
           journalWritten = true;
-          for (const key of [STORE,PREF]) if (next[key] !== raw[key]) storage.setItem(key, next[key]);
+          for (const key of keys) if (next[key] !== raw[key]) {
+            if (next[key] === null) storage.removeItem(key); else storage.setItem(key,next[key]);
+          }
           storage.removeItem(JOURNAL);
         } catch (error) {
           if (journalWritten) {
@@ -246,7 +277,7 @@ const SumiData = (() => {
           if (error.message.startsWith('其他页面')) throw error;
           fail('保存失败：浏览器存储空间不足或不可用，本次更改未保存。请保留当前页面并导出备份。' + (!readable ? ' 恢复未完成，请检查存储权限后刷新。' : ''));
         }
-        raw = next; blocked = false;
+        raw = next; data = checkedData; prefs = p; metadata = nextMetadata; blocked = false;
         issues.length = 0;
       }
     };

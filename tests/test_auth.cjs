@@ -135,3 +135,14 @@ test('every auth message and supported error is available in all four languages'
   }
   for(const error of [{code:'invalid_credentials'},{code:'email_not_confirmed'},{code:'over_request_rate_limit'},{code:'over_email_send_rate_limit'},{name:'AuthRetryableFetchError'},{message:'auth-storage-unavailable'},{}])assert.ok(messages['auth.'+Auth.errorCode(error)]);
 });
+test('cloud client access requires a freshly verified matching account',async()=>{
+  const f=fake();const client=await f.manager.syncClient(A);assert.equal(typeof client.auth.getUser,'function');
+  assert.ok(f.calls.some(call=>call[0]==='getUser'));await assert.rejects(f.manager.syncClient(B),/sync-auth/);
+});
+test('a cached offline identity cannot start a cloud transfer',async()=>{
+  const f=fake({userError:{name:'AuthRetryableFetchError'}});await assert.rejects(f.manager.syncClient(A),/sync-network/);
+  assert.equal(f.manager.getState().verification,'cached');assert.equal(f.manager.getState().user.id,A);
+});
+test('cloud client access stops after current-device logout',async()=>{
+  const f=fake();await f.manager.restore();await f.manager.logout();await assert.rejects(f.manager.syncClient(A),/sync-auth/);
+});
