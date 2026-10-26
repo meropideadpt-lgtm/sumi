@@ -172,6 +172,18 @@ PYTHONPATH=tests python -m unittest test_pages_verify.PagesVerifyTests.test_real
 
 **發布阻擋項：**執行環境尚未放行真實網域；已授權測試帳號／正式測試資料範圍尚未確認；真實 JWT、A/B/匿名隔離、RPC、Storage、瀏覽器 CORS、多裝置／PWA／實體 Safari/Android 與讀屏驗收尚未完成。先由使用者套用環境草稿，再確認專用帳號與資料範圍、獨立 HTTPS 測試站的安排，不需要提供任何密碼或 Token。助手沒有執行正式 SQL、改正式資料、合併或部署。本輪到此停止。
 
+## 本輪期間的外部合併與部署（狀態更正）
+
+本輪開始時 PR #10 確為 open / draft / head `878a61b`。提交後更新 PR 時發現狀態已改變，隨即查證 GitHub 事件及部署紀錄：
+
+- 2026-10-26 **10:22:28 UTC**，`meropideadpt-lgtm` 將 PR #10 轉為 ready for review。
+- **10:22:32 UTC**，同一擁有者合併 PR #10；合併 head 為 `878a61b`，main merge 為 `7333dee5c1fec8e1c217cb924d9a5c1b96bb2dec`。
+- main [Actions `40306921507`](https://github.com/meropideadpt-lgtm/sumi/actions/runs/40306921507) 的 DB、browser、deploy-pages 均 success。Pages deployment `7329647860` 於 **10:37:42 UTC** 回報 success，環境網址為正式 `/sumi/`。這是 GitHub 回報的部署結果，不代表本助手已連線驗證正式網頁或 Supabase。
+- 本輪修正提交 **`fb6660bc1049d780bf0ea439e4132fb792702dc8`** 已推送原分支，但不包含於該 PR 已合併範圍或 main。PR #10 已合併不能再作為 Draft 更新 code diff；其描述將記錄這個差異，不假稱新修正已納入 PR。
+- 以上合併／部署不是助手執行；沒有回退 main、重建 PR 或再次部署。更正文件後會只在原分支以 `workflow_dispatch` 跑既有 CI；其 ref 不是 main，deploy-pages 條件為 false。這是驗證尚未合併的追加修改，不重新觸發正式部署。
+
+後續若要將追加修改交付正式站，需要使用者確認新的 PR 承載方式；本輪遵守不另建 PR 的原工作流程並停止擴展。真實網路與授權測試的阻擋項仍存在，不因外部合併而自動視為已驗收。
+
 ## 下一輪範圍（本輪不繼續擴展）
 
 1. 訂閱、付款／凍結匯率、圖片與偏好的模擬整合已完成；下一步是整理完整啟用驗收清單與真實服務／裝置測試，並非直接啟用正式同步。
