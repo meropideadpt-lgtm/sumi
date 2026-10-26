@@ -80,7 +80,7 @@ const SumiSyncController = (() => {
     }
     const actions={inspect:()=>action('preview'),upload:id=>action('enable','upload',id),restore:id=>action('enable','restore',id),
       retry:()=>action(read().state.enabled?'run':'preview'),resolve:(id,choice)=>action('resolve',id,choice),exportBackup,
-      cancelPreview(){if(manager?.cancelPreview)manager.cancelPreview();else localError=null;changed()}};
+      cancelPreview(){if(task)return;localError=null;manager?.cancelPreview();changed()}};
     function start(){
       if(guest||stopped)return;
       window.addEventListener('online',schedule);

@@ -423,7 +423,7 @@ const SumiSync = (() => {
       }catch(cause){lastError=cause.message||'sync-failed';throw cause;}finally{working=false;emit();}
       return run();
     }
-    function cancelPreview(){if(working||running)return false;previewPrivate=null;previewValue=null;emit();return true;}
+    function cancelPreview(){if(working||running)return false;previewPrivate=null;previewValue=null;lastError=null;emit();return true;}
     function pause(value=true){paused=Boolean(value);emit();}
     return Object.freeze({getState,preview,enable,run,resolve,pause,cancelPreview});
   }
