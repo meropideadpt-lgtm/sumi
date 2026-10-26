@@ -1,16 +1,18 @@
 # 第九阶段 A：数据库、版本与权限基础
 
-本文说明可审核 SQL、离线数据库测试和操作说明；它们已随第九阶段恢复检查点保存为 WIP。**没有对正式 Supabase 执行 SQL，没有创建正式表或 bucket，没有合并/部署应用。** 同分支中的前端同步原稿依赖此协议，仍需完成整体验收、用户审核，并另经用户确认在控制台执行 migration 后才能连通真实云数据。当前不要在正式项目执行脚本。
+本文说明 SQL、离线数据库测试和操作说明。**2026-10-26 用户已确认在正式 SUMI 项目执行完整 migration，四表、两 RPC、RLS 和 Private Logo bucket 已存在，且已导出原数据备份。助手没有执行或重跑正式 SQL；不要重复安装或开放数据表直接写入。**
 
-## 用户必须在 Supabase 控制台完成的步骤
+真实服务联调、测试账号授权与发布门槛见 [真實服務驗收](stage9-live-acceptance.md)。同步前端仍在 Draft PR #10，尚未合并或部署。用户确认不等同助手已完成远端 JWT/RLS/Storage 验证。
 
-1. 先在现有 sumi 导出完整 JSON 备份（含图片）；不要删除浏览器本地数据。如果项目已经有其他业务表/Storage policies，先导出其定义并检查是否与 `sumi_*` 命名冲突。
-2. 审核 `supabase/migrations/202610250001_sync_foundation.sql`。打开自己的 Supabase 项目 → **SQL Editor → New query**，粘贴文件的完整内容并运行。只有此正式 migration 应在项目中执行；**不要执行 `supabase/tests/` 的 bootstrap 或测试夹具**。
-3. 在 **Database → Tables** 核对四张 `sumi_*` 表均启用 RLS；在 **Storage** 核对 `sumi-private-logos` 为 **Private**，允许 PNG/JPEG/WebP，大小限制 12 MiB。SQL 会创建本 bucket 的 owner/hash 路径策略和禁止覆盖策略；不需要设置公开 bucket。
-4. 业务同步上线前完成实际项目用户 A/B/匿名的隔离验收，最好在独立测试项目进行。真实测试账号和用户密码不提交仓库、不发送给开发工具。本文末尾列出待验收范围。
-5. 前端 PR 审核发布后，在设置中先检查本地/云端状态，再明确选择首次上传或恢复。不要仅因新设备为空就上传空集合；前端以独立确认流程处理首次连接。
+## 已完成的控制台操作与后续要求
 
-公开 URL 和 Publishable Key 继续由第八阶段配置使用；**不需要也不应提供数据库密码、Secret Key、service_role Key**。当前应用与 SQL 不使用这些管理员凭据。
+1. 用户已完成 JSON 备份、`202610250001_sync_foundation.sql` 安装及表/RLS/RPC/bucket 核对，**本轮无需再执行 SQL**。`supabase/tests/` 的 bootstrap／夹具绝不能在正式项目运行。
+2. 保留 `sumi-private-logos` 为 Private，PNG/JPEG/WebP、12 MiB；不要为了连线测试公开 bucket 或关闭 RLS。SQL 说明中的重复部署／停用操作仅供未来另经批准的维护，本轮不执行。
+3. 表的 API DISABLED 标记不能单独判断 RPC 可用性。应用通过官方 SDK 调用两个 RPC，直接表写入被撤销是设计。若 RPC 报错，按验收文档检查项目 Data API、public schema、函数签名与 EXECUTE 权限。
+4. 真正账号 A/B/匿名的隔离和读写测试尚未完成；需要用户先确认专用测试账号及隔离资料范围。不要提供密码、Token 或管理员凭据。
+5. 特别注意首次 `sumi_sync_pull` 会初始化所属账号的 clock；不能把它当作绝对无写入的健康检查。本轮唯读工具不执行任一 RPC。
+
+公开 URL 和 Publishable Key 继续由第八阶段配置使用。无需数据库密码、Secret Key 或 service_role Key。当前本轮的环境代理拒绝 Supabase CONNECT，必须与 Supabase 自身权限拒绝区分。
 
 ## 表与数据兼容
 

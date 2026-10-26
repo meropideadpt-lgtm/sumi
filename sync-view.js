@@ -6,6 +6,8 @@ const SumiSyncView = (() => {
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
   function errorKey(error) {
     const value = typeof error === 'string' ? error : typeof error?.code === 'string' ? error.code : '';
+    if (value === 'sync-other-tab') return 'otherTab';
+    if (value === 'sync-lock-unavailable') return 'lockUnavailable';
     if (/^(network|offline|sync-network|fetch-failed|sync-offline)$/.test(value)) return 'network';
     if (/^(auth|auth-required|unauthorized|sync-auth|sync-identity|workspace-locked|sync-locked|identity-changed|session-changed)$/.test(value)) return 'auth';
     if (/^(setup|migration-required|migration-missing|sync-unavailable|sync-not-configured|schema-missing)$/.test(value)) return 'setup';

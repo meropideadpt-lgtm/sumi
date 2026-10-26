@@ -40,6 +40,22 @@ test('all sync statuses and unknown error responses have stable translated fallb
   assert.equal(View.errorKey('network'),'network');assert.equal(View.errorKey('migration-missing'),'setup');
   assert.equal(View.errorKey('image-hash-mismatch'),'image');assert.equal(View.errorKey('private SQL statement'),'generic');
 });
+test('writer lock failures give distinct actionable guidance in all four languages',()=>{
+  assert.equal(View.errorKey('sync-other-tab'),'otherTab');
+  assert.equal(View.errorKey('sync-lock-unavailable'),'lockUnavailable');
+  for(const language of I18n.languages){
+    const ui=view(language);
+    for(const [code,key]of [['sync-other-tab','otherTab'],['sync-lock-unavailable','lockUnavailable']]){
+      const text=ui.errorText(code);
+      assert.equal(text,messages['sync.error.'+key][language]);
+      assert.notEqual(text,ui.errorText('unknown'));
+      assert(!text.includes('undefined'));
+    }
+  }
+  assert.match(view().errorText('sync-other-tab'),/Save your work.*close that tab/);
+  assert.match(view().errorText('sync-lock-unavailable'),/HTTPS.*localhost/);
+  assert.match(view().errorText('sync-unavailable'),/Do not simply rerun migrations/);
+});
 test('conflicts expose complete unrounded versions as escaped text and never mutate data',()=>{
   const original={id:'group"<script>',records:[{kind:'payments',id:'id"<img>',local:{name:'<svg onload=alert(1)>',amount:3.123456789,fxSnapshot:{rate:7.8123456789,convertedAmount:24.3981481515}},remote:{amount:99.875}}]};
   const before=JSON.stringify(original);const html=view().markup({status:'conflict',conflicts:[original],hasBackup:true});
