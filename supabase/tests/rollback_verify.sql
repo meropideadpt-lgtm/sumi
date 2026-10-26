@@ -1,0 +1,10 @@
+set role authenticated;
+set request.jwt.claim.sub='22222222-2222-4222-8222-222222222222';
+select test_support.denied('rollback disables pull without dropping data','select public.sumi_sync_pull(auth.uid())');
+select test_support.denied('rollback disables push without dropping data',$$select public.sumi_sync_push(auth.uid(),'00000000-0000-4000-8000-000000000099','[]')$$);
+select test_support.denied('rollback disables direct reads','select * from public.sumi_sync_records');
+select test_support.ok('rollback hides private images without deleting them',(select count(*)=0 from storage.objects));
+select test_support.denied('rollback prevents new private image upload',$$insert into storage.objects(bucket_id,name,owner_id) values('sumi-private-logos','22222222-2222-4222-8222-222222222222/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.webp','22222222-2222-4222-8222-222222222222')$$);
+reset role;
+select test_support.ok('rollback preserves cloud records and operation receipts',exists(select 1 from public.sumi_sync_records where id='race-sub') and exists(select 1 from public.sumi_sync_operations));
+select test_support.ok('rollback preserves private image metadata',exists(select 1 from storage.objects where bucket_id='sumi-private-logos'));

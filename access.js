@@ -58,6 +58,7 @@ const SumiAccess = (() => {
   async function startApp(value){
     if(loaded||loadingApp)return;loadingApp=true;
     workspace.activate(value);workspace.remember(value);
+    if(typeof SumiSyncLock!=='undefined')await SumiSyncLock.claim(value);
     root.hidden=true;root.replaceChildren();document.body.classList.remove('access-visible');
     try{await loadScript('app.js');loaded=true;if(value.mode==='account'&&auth?.getState().user?.id!==value.userId)lock()}
     catch{root.hidden=false;root.innerHTML=`<main class="access-screen"><section class="access-card"><p role="alert">${escape(tr('loadFailed'))}</p><button class="primary" id="auth-reload">${escape(tr('reload'))}</button></section></main>`;root.querySelector('#auth-reload').onclick=()=>location.reload()}
@@ -124,6 +125,17 @@ const SumiAccess = (() => {
     }
   });
   window.addEventListener('online',()=>{if(auth&&workspace.current()?.mode==='account'&&!transitioning)auth.restore()});
+  async function syncClient(){
+    const current=workspace.current();
+    if(current?.mode!=='account'||workspace.isLocked()||transitioning)throw Error('sync-auth');
+    const manager=await ensureAuth(),client=await manager.syncClient(current.userId);
+    if(workspace.isLocked()||workspace.current()!==current||transitioning)throw Error('sync-auth');
+    return client;
+  }
+  function assertSyncIdentity(){
+    const current=workspace.current(),state=auth?.getState();
+    if(current?.mode!=='account'||workspace.isLocked()||transitioning||state?.user?.id!==current.userId||state?.status!=='authenticated')throw Error('sync-auth');
+  }
   queueMicrotask(start);
-  return Object.freeze({panelMarkup,bindPanel,refreshPanel,setBusyCheck:callback=>{isBusy=callback},isLocked:()=>locked,hasDraft:()=>busy||Boolean(!root.hidden&&root.querySelector('#auth-password')?.value)});
+  return Object.freeze({panelMarkup,bindPanel,refreshPanel,syncClient,assertSyncIdentity,setBusyCheck:callback=>{isBusy=callback},isLocked:()=>locked,hasDraft:()=>busy||Boolean(!root.hidden&&root.querySelector('#auth-password')?.value)});
 })();

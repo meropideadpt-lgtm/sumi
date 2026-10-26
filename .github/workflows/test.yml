@@ -7,6 +7,13 @@ on:
 permissions:
   contents: read
 jobs:
+  sync-database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test sync migrations, RLS and Storage policies in disposable PostgreSQL
+        run: bash scripts/test-sync-db.sh
+
   browser-tests:
     runs-on: ubuntu-latest
     steps:
@@ -34,7 +41,7 @@ jobs:
 
   deploy-pages:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: browser-tests
+    needs: [browser-tests, sync-database]
     runs-on: ubuntu-latest
     permissions:
       contents: read

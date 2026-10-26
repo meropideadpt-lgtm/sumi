@@ -1,7 +1,7 @@
 /* Workspace v1: guest keys stay byte-for-byte compatible; identities never share a namespace. */
 const SumiWorkspace = (() => {
   const CHOICE='sumi-workspace-choice-v1', LEGACY_DB='sumi-logo-assets-v1';
-  const KEYS=new Set(['sumi-data-v1','sumi-prefs-v1','sumi-write-journal-v1','sumi-fx-cache-v1']);
+  const KEYS=new Set(['sumi-data-v1','sumi-prefs-v1','sumi-write-journal-v1','sumi-fx-cache-v1','sumi-sync-v1']);
   const userId=value=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value);
   function project(url){try{const parsed=new URL(url);return parsed.protocol==='https:'&&!parsed.username&&!parsed.password&&!parsed.search&&!parsed.hash&&parsed.pathname==='/'?parsed.origin:null}catch{return null}}
   function identity(url,id){const origin=project(url);if(!origin||!userId(id))throw Error('invalid-identity');return Object.freeze({version:1,mode:'account',project:origin,userId:id.toLowerCase(),prefix:`sumi-account-v1:${encodeURIComponent(origin)}:${id.toLowerCase()}:`,dbName:`${LEGACY_DB}:${encodeURIComponent(origin)}:${id.toLowerCase()}`})}

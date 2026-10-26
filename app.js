@@ -5,9 +5,14 @@ const t=(key,params)=>SumiI18n.t('app.'+key,params),tx=(key,params)=>esc(t(key,p
 const dateText=(value,options)=>SumiI18n.date(value,options),numberText=(value,options)=>SumiI18n.number(value,options);
 const t6=(key,params)=>SumiI18n.t('stage6.'+key,params),tx6=(key,params)=>esc(t6(key,params));
 let exporting=false,importing=false,logoStorageWarning=false;
-const errorText=error=>SumiI18n.error(error?.message||error);
+const errorText=error=>String(error?.message||error).startsWith('sync-')?SumiSyncView.errorText(error?.message||error):SumiI18n.error(error?.message||error);
 const workspaceStorage=SumiWorkspace.storage();
-const storage=SumiData.open(workspaceStorage);
+const accountWorkspace=SumiWorkspace.current().mode==='account';
+const canWriteWorkspace=()=>!accountWorkspace||SumiSyncLock.canWrite(Boolean(JSON.parse(workspaceStorage.getItem('sumi-sync-v1')||'null')?.enabled));
+const storage=SumiData.open(workspaceStorage,accountWorkspace?{
+  metadataKey:'sumi-sync-v1',canWrite:canWriteWorkspace,
+  prepareMeta:({data,preferences,metadata,nextData,nextPreferences})=>SumiSync.prepareWrite(data,preferences,nextData,nextPreferences,metadata)
+}:{});
 const logoStore=SumiLogoStore.create({dbName:SumiWorkspace.current().dbName,assertWritable:SumiWorkspace.assertWritable});
 const initialPreferences={...storage.preferences};
 try{if(workspaceStorage.getItem('sumi-prefs-v1')===null){initialPreferences.language=SumiI18n.getLanguage();initialPreferences.theme=SumiTheme.getMode()}}catch{/* Existing storage recovery handles unreadable preferences. */}
@@ -108,7 +113,7 @@ function calendarPage(){
   }
   return `<div class="card"><div class="section-title"><h2>${esc(dateText(month,{year:'numeric',month:'long'}))}</h2><div class="month-switch"><button class="secondary" data-month="-1" aria-label="${tx('previousMonth')}">${sumiIcon('chevron-left')}</button><button class="secondary" data-month="1" aria-label="${tx('nextMonth')}">${sumiIcon('chevron-right')}</button></div></div><div class="calendar-grid">${[5,6,7,8,9,10,11].map(day=>`<div class="small calendar-weekday">${esc(dateText(`2026-01-${String(day).padStart(2,'0')}`,{weekday:'short'}))}</div>`).join('')}${cells.join('')}</div><p class="note">${tx('calendarNote')}</p></div>`;
 }
-function settingsPage(){return `<div class="card"><div class="settings-row"><label for="language">${tx('language')}</label><select class="select" id="language">${[['zh-CN','简体中文'],['zh-TW','繁體中文'],['ja-JP','日本語'],['en','English']].map(([value,label])=>`<option value="${value}" ${preferences.language===value?'selected':''}>${label}</option>`).join('')}</select></div><div class="settings-row"><label for="currency">${tx('displayCurrency')}</label><select class="select" id="currency">${currencyOptions(preferences.currency)}</select></div>${fxPanel()}<div class="settings-row"><label for="theme">${tx('appearance')}</label><select class="select" id="theme">${['light','dark','system'].map(value=>`<option value="${value}" ${preferences.theme===value?'selected':''}>${tx(value)}</option>`).join('')}</select></div><div class="settings-row"><label for="motion">${tx6('motion')}</label><select class="select" id="motion">${['system','reduce'].map(value=>`<option value="${value}" ${(preferences.motion||'system')===value?'selected':''}>${tx6('motion.'+value)}</option>`).join('')}</select></div><div class="settings-row"><label for="reminder">${tx('siteReminder')}</label><select class="select" id="reminder">${[0,1,3,7,14].map(value=>`<option value="${value}" ${Number(preferences.reminder)===value?'selected':''}>${value?tx('daysBefore',{count:numberText(value)}):tx('onDay')}</option>`).join('')}</select></div><div class="settings-row"><label>${tx('backupRestore')}</label><div class="tools"><button class="secondary" id="export">${tx(storage.issues.length?'exportRaw':'exportJSON')}</button><button class="secondary" id="import">${tx('importJSON')}</button><input id="importFile" type="file" accept=".json,application/json" hidden></div></div><p class="note">${tx('backupNote')}</p>${SumiAccess.panelMarkup()}${SumiPWA.settingsMarkup()}</div>`}
+function settingsPage(){return `<div class="card"><div class="settings-row"><label for="language">${tx('language')}</label><select class="select" id="language">${[['zh-CN','简体中文'],['zh-TW','繁體中文'],['ja-JP','日本語'],['en','English']].map(([value,label])=>`<option value="${value}" ${preferences.language===value?'selected':''}>${label}</option>`).join('')}</select></div><div class="settings-row"><label for="currency">${tx('displayCurrency')}</label><select class="select" id="currency">${currencyOptions(preferences.currency)}</select></div>${fxPanel()}<div class="settings-row"><label for="theme">${tx('appearance')}</label><select class="select" id="theme">${['light','dark','system'].map(value=>`<option value="${value}" ${preferences.theme===value?'selected':''}>${tx(value)}</option>`).join('')}</select></div><div class="settings-row"><label for="motion">${tx6('motion')}</label><select class="select" id="motion">${['system','reduce'].map(value=>`<option value="${value}" ${(preferences.motion||'system')===value?'selected':''}>${tx6('motion.'+value)}</option>`).join('')}</select></div><div class="settings-row"><label for="reminder">${tx('siteReminder')}</label><select class="select" id="reminder">${[0,1,3,7,14].map(value=>`<option value="${value}" ${Number(preferences.reminder)===value?'selected':''}>${value?tx('daysBefore',{count:numberText(value)}):tx('onDay')}</option>`).join('')}</select></div><div class="settings-row"><label>${tx('backupRestore')}</label><div class="tools"><button class="secondary" id="export">${tx(storage.issues.length?'exportRaw':'exportJSON')}</button><button class="secondary" id="import">${tx('importJSON')}</button><input id="importFile" type="file" accept=".json,application/json" hidden></div></div><p class="note">${tx('backupNote')}</p>${SumiAccess.panelMarkup()}${SumiSyncView.markup(syncController.model())}${SumiPWA.settingsMarkup()}</div>`}
 // Native pickers belong to the browser. Keep their attached select and option
 // nodes when a preference changes; recreating and focusing them can reopen iPad pickers.
 function refreshSettingsView(){
@@ -137,7 +142,7 @@ function refreshSettingsView(){
   const notice=main.querySelector('.storage-notice:has(#exportRaw)');
   if(notice){notice.firstChild.textContent=storage.issues.map(issue=>errorText(issue)).join(' ')+' ';$('#exportRaw').textContent=t('exportRaw')}
   if($('#logoStorageNotice'))$('#logoStorageNotice').textContent=t6('missingLogo');
-  refreshFxPanel();refreshPwaPanel();SumiAccess.refreshPanel();
+  refreshFxPanel();refreshPwaPanel();SumiAccess.refreshPanel();refreshSyncPanel();
 }
 function refreshFxPanel(){
   const panel=$('.fx-panel');if(!panel)return;
@@ -424,11 +429,11 @@ function showLogoStorageWarning(){
   const note=document.createElement('p');note.id='logoStorageNotice';note.className='storage-notice';note.setAttribute('role','status');note.textContent=t6('missingLogo');$('.main')?.prepend(note);
 }
 function commit(nextData,nextPrefs=preferences,recovery=false){
-  try{storage.write(nextData,nextPrefs,recovery);data=nextData;preferences=nextPrefs;return true}
+  try{storage.write(nextData,nextPrefs,recovery);data=nextData;preferences=nextPrefs;syncController.schedule();return true}
   catch(error){alert(errorText(error));return false}
 }
 function commitPreferences(nextPrefs){
-  try{storage.writePreferences(nextPrefs);preferences=nextPrefs;return true}catch(error){alert(errorText(error));return false}
+  try{storage.writePreferences(nextPrefs);preferences=nextPrefs;syncController.schedule();return true}catch(error){alert(errorText(error));return false}
 }
 function updateData(change){try{const next=structuredClone(data);change(next);const recorded=SumiStats.recordChanges(data,next,today(),new Date().toISOString(),id);return commit(recorded)}catch(error){alert(errorText(error));return false}}
 function downloadJson(value,name){
@@ -447,6 +452,7 @@ function bindValidation(){
 }
 function bind(){
   SumiAccess.bindPanel();
+  SumiSyncView.bind($('#syncPanel'),syncController.actions);
   bindLogos();bindValidation();SumiPWA.bind();
   $('#refreshRates')?.addEventListener('click',()=>fxManager.refresh({force:true}));
   $('#startCostHistory')?.addEventListener('click',()=>{if(updateData(()=>{}))render()});
@@ -589,9 +595,14 @@ function bind(){
     finally{importing=false;e.target.value=''}
   });
 }
-SumiAccess.setBusyCheck(()=>Boolean(modal||paymentModal||picker||logoUploading||exporting||importing||confirming));
-render();uiReady=true;fxManager.refresh();
-SumiPWA.start({isBusy:()=>Boolean(modal||paymentModal||picker||logoUploading||exporting||importing||confirming||SumiAccess.hasDraft()),onChange:refreshPwaPanel});
+const hasAppDraft=()=>Boolean(modal||paymentModal||picker||logoUploading||exporting||importing||confirming);
+const syncController=SumiSyncController.create({storage,workspace:SumiWorkspace,logoStore,readLocal:()=>({data,preferences}),isBusy:hasAppDraft,
+  onApply:snapshot=>{data=snapshot.data;preferences=snapshot.preferences;if(uiReady){if(view==='settings')refreshSettingsView();else render()}},
+  onChange:()=>{if(uiReady)refreshSyncPanel()},download:downloadJson});
+function refreshSyncPanel(){SumiSyncView.refresh($('#syncPanel'),syncController.model(),syncController.actions)}
+SumiAccess.setBusyCheck(()=>hasAppDraft()||syncController.isBusy());
+render();uiReady=true;fxManager.refresh();syncController.start();
+SumiPWA.start({isBusy:()=>Boolean(hasAppDraft()||syncController.isBusy()||SumiAccess.hasDraft()),onChange:refreshPwaPanel});
 // Finish deferred FX presentation after a click or keyboard action completes.
 // A focusout repaint would remove the next button between pointerdown and click.
 // The state/cache is already current; no timers, blur(), or picker reopening is needed.

@@ -37,10 +37,10 @@ Object.assign(globalThis.SumiMessages,{
     "en": "Continue as a local guest"
   },
   "auth.separate": {
-    "zh-CN": "访客与账号工作区独立，数据不会自动迁移或上传。",
-    "zh-TW": "訪客與帳號工作區獨立，資料不會自動移轉或上傳。",
-    "ja-JP": "ゲストとアカウントのデータは別々です。自動で移行・アップロードされません。",
-    "en": "Guest and account workspaces are separate. Data is never moved or uploaded automatically."
+    "zh-CN": "访客与账号工作区独立，云端同步需在设置中首次确认启用。",
+    "zh-TW": "訪客與帳號工作區獨立，雲端同步須在設定中首次確認啟用。",
+    "ja-JP": "ゲストとアカウントのデータは別々です。クラウド同期は設定で初回の有効化を確認してください。",
+    "en": "Guest and account workspaces are separate. Cloud sync requires your initial confirmation in Settings."
   },
   "auth.restoring": {
     "zh-CN": "正在恢复登录状态…",
@@ -133,10 +133,10 @@ Object.assign(globalThis.SumiMessages,{
     "en": "Existing data stays on this device, with offline access and JSON backups."
   },
   "auth.accountNote": {
-    "zh-CN": "此账号的记录仅保存在当前设备。云同步尚未开启，访客数据保持独立。",
-    "zh-TW": "此帳號的紀錄僅儲存在目前裝置。雲端同步尚未開啟，訪客資料保持獨立。",
-    "ja-JP": "このアカウントの記録はこの端末だけに保存されます。クラウド同期は未導入で、ゲストデータとは別です。",
-    "en": "These account records are stored only on this device. Cloud sync is not enabled; guest data remains separate."
+    "zh-CN": "此账号的记录与访客数据保持独立。云端同步状态和首次启用选项见下方。",
+    "zh-TW": "此帳號的紀錄與訪客資料保持獨立。雲端同步狀態與首次啟用選項見下方。",
+    "ja-JP": "このアカウントの記録はゲストデータと別です。クラウド同期の状態と初回の設定は以下に表示されます。",
+    "en": "These account records are separate from guest data. Cloud sync status and initial setup appear below."
   },
   "auth.logout": {
     "zh-CN": "退出登录",
