@@ -26,6 +26,18 @@ GitHub 最新 main 為 `927ec27`，已合併 PR #9 的黑白 S-dot 圖示。保�
 - 恢復的 engine / transport / local / lock 測試：71/71 通過。修改後 controller + engine：41/41 通過（其中 30 項 engine 與前項重疊，不能相加為不重複測試數）。
 - `bash scripts/test-sync-db.sh`：97/97 斷言通過，涵蓋 A/B/匿名權限、owner fence、重複操作、版本、墓碑、Storage policies、並發與非破壞性停用/重套用。容器為 PostgreSQL 17，`--network none`，未接觸正式 Supabase。Storage schema 為相容測試夾具，不能代替真正 Storage HTTP 驗收。
 - 更新 PWA 靜態資源清單以納入恢復的同步模組；不部署。本輪只執行相關同步、資源一致性與後續訂閱瀏覽器驗證，不在本地重跑完整產品測試套件。
+- `38b3e5a`：上述可獨立驗證階段已再次提交並推送至同一 Draft PR。
+- `tests/test_sync_subscriptions_browser.py`：1/1 Chromium 整合流程通過。使用實際 app 和官方 Supabase SDK、模擬 HTTP 服務、獨立桌面（1440×1000）與平板觸控（820×1180）瀏覽器 context，實際操作表單／同步按鈕完成上傳、第二端還原、金額修改後同步回桌面、重開、切回訪客；原 ID、還原備份、帳號資料與訪客原始位元組均保留。這不是完整跨裝置驗收，也不是真實 iPad。
+- PWA 相關定向檢查 2/2 通過：94 項快取資源的 SHA-256、版本與安裝圖示；`/sumi/` 打包資源校驗 1/1 通過，核對 104 個發佈檔案（含同步模組，不含 `.nojekyll`）。未執行部署。
+
+本輪本地不重複測試合計：82 項同步 Node 測試（30 engine、25 transport、11 local、5 lock、11 controller）、2 項 PWA 定向測試、1 項發佈資源測試、1 項訂閱瀏覽器流程，另有 97 項 SQL 斷言。沒有把此範圍宣稱為完整產品回歸。GitHub PR 的既有 CI 會在推送後自動跑原本的完整工作流程。
+
+## 下一輪範圍（本輪不繼續擴展）
+
+1. 獨立驗證圖片跨裝置傳輸、付款及凍結匯率的完整應用流程；目前保留已有實作和單元測試，未完成全鏈路驗收。
+2. 整理同步狀態介面的邊界提示（例如另一分頁持有寫入鎖）、四語介面、視覺與無障礙驗收；不以本輪的一個瀏覽器流程取代它們。
+3. 使用者審核 migration 並明確同意後，再安排 Supabase 測試專案的 Auth/RPC/RLS/Storage 聯調、故障與真實 Safari/Android 驗收。現階段無須在正式控制台執行任何 SQL。
+4. 完整第九階段仍是 WIP；未完成項目應分成後續可審查階段，不在此輪一次性完成。
 
 最初 WIP 的遠端 CI：資料庫 job 通過，Node 測試步驟失敗，後續瀏覽器步驟未執行；此時資源雜湊尚未更新。最終提交的 CI 狀態會另行更新，不將 WIP 檢查點說成全綠。
 
