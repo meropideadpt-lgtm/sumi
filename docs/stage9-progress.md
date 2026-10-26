@@ -32,13 +32,60 @@ GitHub 最新 main 為 `927ec27`，已合併 PR #9 的黑白 S-dot 圖示。保�
 
 本輪本地不重複測試合計：82 項同步 Node 測試（30 engine、25 transport、11 local、5 lock、11 controller）、2 項 PWA 定向測試、1 項發佈資源測試、1 項訂閱瀏覽器流程，另有 97 項 SQL 斷言。沒有把此範圍宣稱為完整產品回歸。GitHub PR 的既有 CI 會在推送後自動跑原本的完整工作流程。
 
+## 2026-10-26：付款歷史與凍結匯率整合驗收
+
+沿用 `feat/cloud-sync-stage9-wip` / Draft PR #10，開始時本機與遠端均為 `1e57397`，工作區乾淨。上一輪 [完整 CI](https://github.com/meropideadpt-lgtm/sumi/actions/runs/40282710654) 的最終結論已確認為 **success**。main 仍為 `927ec27`，新圖示保持原樣。本輪不開發 Logo、設定同步或任何原生應用。
+
+### 沿用的既有實作
+
+- `app.js` 的付款確認、失敗記錄、補錄、編輯、刪除及 `changePayment` 已把付款與續費日期放入同一次本地寫入。
+- `exchange.js` 的 `freeze` / `revise` / `valuePayment` 已保存並使用確認當時的匯率矩陣；編輯日期不重建快照，明確修改金額才以舊矩陣修訂換算結果，保持原確認時間。參考匯率更新不會自動回算歷史付款。
+- 同步引擎、傳輸層與 SQL 已具有付款逐記錄版本、原子批次、重複 operation 回執、付費帳期唯一、墓碑及父子關聯衝突。先前已有單元測試與本地 SQL 驗證；本輪補上實際表單／官方 SDK／模擬 RPC 的應用整合驗收。
+
+### 本輪修改與結果
+
+新增 `tests/test_sync_payments_browser.py`，沿用上一輪的 `SubscriptionCloud` 模擬服務；僅在該測試夾具加入請求記錄、遺失回執、讀回失敗及付款業務衝突掛鉤。所有業務變更經由實際表單、確認按鈕、JSON 匯入／匯出及同步選擇操作，沒有在測試中替換 app、同步引擎或 SDK。
+
+| 新增的瀏覽器流程 | 驗證結果 |
+| --- | --- |
+| 成功付款、失敗付款、補錄、修改與刪除 | 成功付款與月底續費日期同批同步；失敗付款沒有成功匯率快照、不推進帳期；補錄可保留無帳期關聯。日期編輯保留完整快照，明確修改金額使用原凍結矩陣。刪除成功付款傳播墓碑並正確回復未付款帳期。 |
+| 跨裝置還原與匯率刷新 | 平板原有付款先保存在本地還原備份中，不會被偷偷上傳；從雲端還原後，兩端手動更新參考匯率及重新整理均保持付款原值、ID 和快照。 |
+| 舊資料精度與擴展欄位 | 既有多位小數原始金額、重複小數匯率及巢狀擴展欄位，經上傳、手機還原、日期編輯、更新匯率及 JSON 匯出仍逐值一致；缺少歷史匯率的舊付款不補算。 |
+| 離線修改、重開與中斷續傳 | 待同步 operation ID 及付款內容跨重開保留；服務端提交後遺失回執時使用同一 ID／同一內容重試，版本只增加一次。即使收到成功回執，讀回失敗仍保留佇列，恢復後才能清除。 |
+| 同帳期重複確認 | 同端雙擊及兩端確認同一帳期不產生兩筆雲端成功付款、不重複推進續費；跨端競爭顯示 `paid-cycle` 衝突，保留本地版本並要求明確選擇。 |
+| 同筆付款衝突與訂閱刪除 | 同筆金額的兩個版本及各自快照完整顯示，分別驗證選用雲端／本地版本；刪除訂閱與付款同批發送，離線付款修改不能靜默復活已刪除的訂閱或成為雲端孤兒。 |
+
+本輪沒有發現需修復的產品缺陷；**未修改任何應用程式 JS、同步引擎、傳輸層、控制器、SQL、圖示或工作流程**。首次執行有兩項測試錯把付款陣列位置視為跨裝置不變條件；修正為保留重複筆數檢查的完整記錄比對，不忽略 ID、金額、快照或擴展欄位。未為了讓測試通過而修改同步資料排序。
+
+測試結果（不重複計數）：
+
+- 新增付款整合：**6/6** 通過。先執行六項，修正比較方式後只重跑受影響的兩項；補上還原前付款備份斷言後只重跑該流程。
+- 既有訂閱瀏覽器流程：**1/1** 通過。
+- `test_billing.cjs`、`test_exchange.cjs`、`test_sync_engine.cjs`：**71/71** 通過（19 + 22 + 30）。
+- PWA 資源雜湊／版本及圖示定向測試：**2/2** 通過；94 項快取資源仍正確，無需重新產生 `sw-assets.js`。
+- `/sumi/` 發佈資源定向驗證：**1/1** 通過，涵蓋 104 個發佈檔案。
+- 本輪未在本地重跑完整產品套件或未變動的 SQL 權限套件；PR 推送會自動觸發既有 CI。`1e57397` 的通過結果不代表本輪新提交的 CI 結論。
+
+可重現本輪相關驗證：
+
+```sh
+PYTHONPATH=tests python -m unittest test_sync_payments_browser test_sync_subscriptions_browser -v
+node --test tests/test_billing.cjs tests/test_exchange.cjs tests/test_sync_engine.cjs
+node --test --test-name-pattern='generated shell manifest|manifest supports scoped' tests/test_pwa.cjs
+PYTHONPATH=tests python -m unittest test_pages_verify.PagesVerifyTests.test_real_packaged_release_verifies_all_published_resources_including_auth -v
+```
+
+範圍與限制：使用實際 Sumi、現有官方 SDK、獨立 Chromium context（桌面 1440×1000、平板觸控 820×1180、手機觸控 390×844），GoTrue／RPC／Frankfurter 均為模擬回應。離線情境使 Auth／RPC／FX 請求失敗並將 `navigator.onLine` 設為 false；重開時靜態殼仍由本地測試伺服器提供，Service Worker 關閉，並非本輪重新驗收完整 PWA 斷網啟動。精度保留依現有 JavaScript 數值模型逐值檢查；換算結果繼續沿用原本貨幣小數位規則，不宣稱支援任意精度十進位。
+
+**尚未完成真實 Supabase、RLS／Storage HTTP、實體 iPadOS Safari／Android 驗證。正式資料庫未修改，未執行遠端 SQL，未合併或部署。** 此輪完成付款與凍結匯率的模擬整合驗收後停止。
+
 ## 下一輪範圍（本輪不繼續擴展）
 
-1. 獨立驗證圖片跨裝置傳輸、付款及凍結匯率的完整應用流程；目前保留已有實作和單元測試，未完成全鏈路驗收。
+1. 獨立驗證圖片跨裝置傳輸與偏好同步；付款及凍結匯率的模擬應用流程已於上節完成，真實服務／裝置驗收仍待進行。
 2. 整理同步狀態介面的邊界提示（例如另一分頁持有寫入鎖）、四語介面、視覺與無障礙驗收；不以本輪的一個瀏覽器流程取代它們。
 3. 使用者審核 migration 並明確同意後，再安排 Supabase 測試專案的 Auth/RPC/RLS/Storage 聯調、故障與真實 Safari/Android 驗收。現階段無須在正式控制台執行任何 SQL。
 4. 完整第九階段仍是 WIP；未完成項目應分成後續可審查階段，不在此輪一次性完成。
 
-最初 WIP 的遠端 CI：資料庫 job 通過，Node 測試步驟失敗，後續瀏覽器步驟未執行；此時資源雜湊尚未更新。最終提交的 CI 狀態會另行更新，不將 WIP 檢查點說成全綠。
+最初 WIP 的遠端 CI：資料庫 job 通過，Node 測試步驟失敗，後續瀏覽器步驟未執行；此時資源雜湊尚未更新。其後 `1e57397` 的完整 CI 已通過，見上節連結；新提交須獨立查看其 Checks。
 
 尚未完成：真實 Supabase RPC/Storage 聯調、真實多裝置與 iPadOS Safari 雲同步、完整應用/視覺回歸及整體第九階段驗收。正式資料庫未修改；既有本地與訪客資料不得刪除或搬移。

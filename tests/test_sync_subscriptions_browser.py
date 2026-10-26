@@ -18,6 +18,13 @@ class SubscriptionCloud:
         self.receipts = {}
         self.sequence = 0
         self.calls = []
+        self.pushes = []
+        self.drop_next_ack = False
+        self.fail_readback = False
+        self.fail_reads = False
+
+    def business_conflicts(self, changes):
+        return []
 
     def route(self, route):
         request = route.request
@@ -34,6 +41,8 @@ class SubscriptionCloud:
         name = request.url.rsplit('/', 1)[1]
         self.calls.append(name)
         if name == 'sumi_sync_pull':
+            if self.fail_reads:
+                return route.abort('internetdisconnected')
             rows = sorted((r for r in self.rows.values() if int(r['seq']) > int(args['p_after'])), key=lambda r: int(r['seq']))
             page = rows[:args['p_limit']]
             more = len(rows) > len(page)
@@ -43,6 +52,7 @@ class SubscriptionCloud:
             assert name == 'sumi_sync_push'
             operation = args['p_operation_id']
             changes = args['p_changes']
+            self.pushes.append(copy.deepcopy(args))
             if operation in self.receipts:
                 body, result = self.receipts[operation]
                 assert changes == body
@@ -50,6 +60,8 @@ class SubscriptionCloud:
                 conflicts = [{'kind': c['kind'], 'id': c['id'], 'baseRevision': c['baseRevision'],
                               'reason': 'revision', 'remote': self.rows.get((c['kind'], c['id']))}
                              for c in changes if self.rows.get((c['kind'], c['id']), {}).get('revision', 0) != c['baseRevision']]
+                if not conflicts:
+                    conflicts = self.business_conflicts(changes)
                 if conflicts:
                     result = {'ok': False, 'conflicts': conflicts}
                 else:
@@ -62,6 +74,12 @@ class SubscriptionCloud:
                         records.append(row)
                     result = {'ok': True, 'records': records}
                     self.receipts[operation] = (copy.deepcopy(changes), copy.deepcopy(result))
+            if result['ok'] and self.fail_readback:
+                self.fail_reads = True
+                self.fail_readback = False
+            if result['ok'] and self.drop_next_ack:
+                self.drop_next_ack = False
+                return route.abort('internetdisconnected')
         route.fulfill(headers=headers, json=result)
 
 
