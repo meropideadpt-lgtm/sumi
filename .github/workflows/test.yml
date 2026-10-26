@@ -9,10 +9,19 @@ permissions:
 jobs:
   sync-database:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Test bounded startup and failure diagnostics
+        run: SUMI_TEST_DB_STARTUP=1 python3 -m unittest discover -s tests -p 'test_sync_db_runner.py' -v
       - name: Test sync migrations, RLS and Storage policies in disposable PostgreSQL
         run: bash scripts/test-sync-db.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sync-database-diagnostics
+          path: tests/artifacts/sync-database/
+          retention-days: 7
 
   browser-tests:
     runs-on: ubuntu-latest

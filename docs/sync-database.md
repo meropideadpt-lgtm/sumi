@@ -84,6 +84,14 @@ bash scripts/test-sync-db.sh
 
 脚本使用固定摘要的 PostgreSQL 17 Alpine 镜像，启动临时 `--network none` 容器，通过本地 Docker socket / `docker exec psql` 操作。测试角色和 auth.uid/Storage schema 仅在此一次性容器内模拟；不读取 DATABASE_URL、正式项目 URL 或任何正式账号密码。容器中的 trust 认证只用于无外网、无映射端口的临时测试。
 
+CI 就绪检查使用容器内 TCP `SELECT 1`，排除官方镜像初始化期间的临时 socket 服务；总期限 60 秒，每次探测最长 3 秒。SQL/RLS 测试失败不重试。运行日志及失败的 PostgreSQL 日志、容器 State、并发日志保存在 `tests/artifacts/sync-database/`，CI 上传为保留 7 天的 `sync-database-diagnostics` artifact。不会导出容器环境变量。
+
+验证启动竞态及诊断保留：
+
+```sh
+SUMI_TEST_DB_STARTUP=1 python -m unittest discover -s tests -p test_sync_db_runner.py -v
+```
+
 测试覆盖 A/B/匿名读写隔离、默认 PUBLIC EXECUTE 撤销、owner 注入和重分配、A/B 令牌与 expected-owner 不匹配/空值拒绝、同文本 ID 跨账号隔离、复合外键、重复 operation、整批冲突回滚、付款周期唯一、失败/归档付款、历史 JSON/冻结汇率原样保存、墓碑/关联冲突、分页、并发时钟提交顺序、已有宽泛 Storage policy 防御、哈希路径/上传/覆盖/删除隔离、重复 migration 与非破坏性停用/恢复。
 
 真实 Supabase 仍必须验收：项目中 actual RLS + Storage API（A 自己 CRUD，B 和匿名不能读写/签名/覆盖 A 图片）、JWT 到期/撤销、浏览器 fetch/CORS、私有下载、真实图片 MIME/尺寸拒绝，以及电脑/iPad/Android 的跨设备完整同步。**未对正式项目运行这些步骤，未验证真实 Safari/iPadOS 云同步。**
