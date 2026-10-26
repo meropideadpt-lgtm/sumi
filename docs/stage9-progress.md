@@ -130,13 +130,67 @@ PYTHONPATH=tests python -m unittest test_pages_verify.PagesVerifyTests.test_real
 
 **邊界：**獨立 Chromium 桌面（1440×1000）、平板觸控（820×1180）、手機觸控（390×844）context；Auth／RPC／Storage／匯率皆為隔離模擬服務。離線測試阻斷 API，靜態殼仍由本地伺服器供應、Service Worker 關閉；不宣稱本輪完成真實 PWA 斷網啟動、真實 Supabase HTTP 或實體 iPadOS Safari／Android 驗收。沒有清除或遷移任何使用者資料，沒有執行正式 SQL、合併或部署。本輪到此停止。
 
+## 2026-10-26：真實服務聯調準備與發布前介面修正
+
+本輪沿用 `878a61b` 的乾淨原工作區、原分支與 Draft PR #10；遠端 [CI 40297611691](https://github.com/meropideadpt-lgtm/sumi/actions/runs/40297611691) 已確認 success，並非沿用上輪「執行中」狀態。使用者另已確認在正式 SUMI 專案完成 migration、四張表、兩個 RPC、RLS、Private Logo bucket（12 MiB、PNG/JPEG/WebP）及原資料 JSON 備份。這是使用者提供的實際操作結果，不是本助手取得的遠端 catalog 驗證。本輪不重新執行 migration。
+
+### 真實連線：尚未成功，原因在執行環境
+
+- 核對現有 URL／Publishable Key 與官方 SDK 2.118.0；未更換配置、未讀取私人憑據。SDK 原始檔與 vendor SHA-256 紀錄一致，相關測試通過。
+- 對真實 `/auth/v1/health` 發送帶公開 apikey 與 Pages Origin 的 GET；代理 CONNECT 回覆 **403 Forbidden**，連線尚未到達 Supabase。不能寫成 Supabase API、RPC、JWT、CORS 或 Storage 已通過或已失敗。
+- 已使用環境設定工作流程保存最小網路草稿：新增 `qcboybxjjegdwpbbtbaj.supabase.co`，保留既有四個明確網域及 presets。未增加任何密鑰需求、未更改安裝指令或倉庫配置。工具確認 saved、requires_publish；其後重查 runtime，網域仍未套用。使用者需審查／儲存並發布環境；未繞過代理、未透過 CI 當作網路轉送替代。
+- 沒有已授權的專用測試帳號／正式測試資料範圍，沒有登入真實帳號或執行任何正式 RPC／Storage 資料操作，沒有新增／修改／刪除正式記錄。
+
+### 檢查結果與本輪修正
+
+1. **權限架構保持不變。** 四表直接寫入撤銷是設計；官方 SDK 以 POST 呼叫 pull／push，完整參數與 migration 簽名一致，`p_expected_owner` 額外比對 JWT。表的 API DISABLED 標記不能當作必須放寬權限的理由。Private Storage 使用 owner/hash、不可覆蓋、下載後驗證 MIME／大小／解碼／hash；設計與原模擬／SQL 測試一致，真實 HTTP 尚未驗收。
+2. **首次 pull 有中繼資料寫入。** SQL 的 `sumi_sync_pull` 首次可建立 `sumi_sync_clock` 並取得鎖，因此登入後的「查看本機與雲端」也必須等測試範圍獲批准。保留原 SQL；未把它誤當純唯讀探測。
+3. **修正具體提示缺陷。** controller 已產生 `sync-other-tab`／`sync-lock-unavailable`，view 原先只顯示一般重試錯誤。新增四語提示：先儲存並關閉持鎖分頁後重試，或使用支援 Web Locks 的 HTTPS／localhost 瀏覽器環境；保留本機資料。RPC 設定錯誤提示亦改為核對 API／函式／權限，避免引導使用者重跑已安裝的 migration 或開放直接寫表。
+4. **新增唯讀診斷工具** `scripts/check-sync-connectivity.cjs`：需明確 `--read-only`，沿用公開配置與校驗後的原官方 SDK，只允許固定 9 個 GET／HEAD／OPTIONS 請求，拒絕登入 JWT、寫入方法、不同 origin、任意 body／查詢及重新導向。匿名 SDK HEAD 不下載資料，兩個 RPC 只做 OPTIONS；不執行 RPC，也不嘗試上傳。報告明列 authenticated RPC／Private Storage transfer／真正瀏覽器 CORS 未執行，不輸出 Key、Token 或回應資料。工具安全邊界與請求串接已在模擬 fetch 下驗證；因既有政策拒絕，未對正式服務重複執行整個工具。
+5. **更新資源與文件。** `sw-assets.js` 為 94 個資源、版本 `eb58c204d623152afbce554c`；新增 [真實服務與發布前驗收](stage9-live-acceptance.md)，修正資料庫說明中「尚未安裝」的過期描述。明列專用 A/B 帳號、人工登入、不共享 Token、隔離 HTTPS 測試 origin、實機案例與發布門檻。同 origin 不同路徑不構成本地資料隔離。main 推送會自動部署，未授權時不能先合併 PR。
+
+### 本輪相關自動化驗證
+
+| 範圍 | 結果與邊界 |
+| --- | --- |
+| 新唯讀工具安全邊界／SDK 模擬連線 + 同步 view Node | **14/14 通過**（5 + 9），不是實際連線測試。 |
+| Auth、transport、controller、lock Node 回歸 | **63/63 通過**，含 SDK 原始檔 hash、固定身分、帳號隔離及寫入鎖。 |
+| 同步介面瀏覽器 | **9/9 通過**，原有 6 項 + 新增四語鎖提示、實際雙分頁鎖釋放後重試、不支援 Web Locks 仍可保存本地帳號資料；Auth 為模擬。 |
+| 四語／版面 | 既有測試涵蓋 4 語言 × 320/390/820/1440 寬度 × 深淺主題，保留鍵盤／觸控操作、焦點、錯誤去敏感化及完整衝突快照。新增提示亦通過手機深淺主題檢查。這是 Chromium 模擬視口，不是真實 iPad。 |
+| PWA 與 Pages | **2/2 + 1/1 通過**，94 項資源及 104 個發佈檔案（含同步模組）；工具／驗收文件未加入發布資源。 |
+
+本輪未重跑未變動的整套 SQL 或付款／圖片瀏覽器驗收；前輪證據保留，既有 CI 會在推送後執行完整工作流程。最新提交的 Checks 結果記於 PR 描述，不能把 `878a61b` 的成功當作新提交結果。
+
+重現本輪測試（均無正式網路資料操作）：
+
+```sh
+node --test tests/test_sync_connectivity.cjs tests/test_sync_view.cjs tests/test_auth.cjs tests/test_sync_transport.cjs tests/test_sync_controller.cjs tests/test_sync_lock.cjs
+PYTHONPATH=tests python -m unittest test_sync_view -v
+node --test --test-name-pattern='generated shell manifest|manifest supports scoped' tests/test_pwa.cjs
+PYTHONPATH=tests python -m unittest test_pages_verify.PagesVerifyTests.test_real_packaged_release_verifies_all_published_resources_including_auth -v
+```
+
+**發布阻擋項：**執行環境尚未放行真實網域；已授權測試帳號／正式測試資料範圍尚未確認；真實 JWT、A/B/匿名隔離、RPC、Storage、瀏覽器 CORS、多裝置／PWA／實體 Safari/Android 與讀屏驗收尚未完成。先由使用者套用環境草稿，再確認專用帳號與資料範圍、獨立 HTTPS 測試站的安排，不需要提供任何密碼或 Token。助手沒有執行正式 SQL、改正式資料、合併或部署。本輪到此停止。
+
+## 本輪期間的外部合併與部署（狀態更正）
+
+本輪開始時 PR #10 確為 open / draft / head `878a61b`。提交後更新 PR 時發現狀態已改變，隨即查證 GitHub 事件及部署紀錄：
+
+- 2026-10-26 **10:22:28 UTC**，`meropideadpt-lgtm` 將 PR #10 轉為 ready for review。
+- **10:22:32 UTC**，同一擁有者合併 PR #10；合併 head 為 `878a61b`，main merge 為 `7333dee5c1fec8e1c217cb924d9a5c1b96bb2dec`。
+- main [Actions `40306921507`](https://github.com/meropideadpt-lgtm/sumi/actions/runs/40306921507) 的 DB、browser、deploy-pages 均 success。Pages deployment `7329647860` 於 **10:37:42 UTC** 回報 success，環境網址為正式 `/sumi/`。這是 GitHub 回報的部署結果，不代表本助手已連線驗證正式網頁或 Supabase。
+- 本輪修正提交 **`fb6660bc1049d780bf0ea439e4132fb792702dc8`** 已推送原分支，但不包含於該 PR 已合併範圍或 main。PR #10 已合併不能再作為 Draft 更新 code diff；其描述將記錄這個差異，不假稱新修正已納入 PR。
+- 以上合併／部署不是助手執行；沒有回退 main、重建 PR 或再次部署。更正文件後會只在原分支以 `workflow_dispatch` 跑既有 CI；其 ref 不是 main，deploy-pages 條件為 false。這是驗證尚未合併的追加修改，不重新觸發正式部署。
+
+後續若要將追加修改交付正式站，需要使用者確認新的 PR 承載方式；本輪遵守不另建 PR 的原工作流程並停止擴展。真實網路與授權測試的阻擋項仍存在，不因外部合併而自動視為已驗收。
+
 ## 下一輪範圍（本輪不繼續擴展）
 
 1. 訂閱、付款／凍結匯率、圖片與偏好的模擬整合已完成；下一步是整理完整啟用驗收清單與真實服務／裝置測試，並非直接啟用正式同步。
 2. 整理同步狀態介面的邊界提示（例如另一分頁持有寫入鎖）、四語介面、視覺與無障礙驗收；不以本輪的一個瀏覽器流程取代它們。
-3. 使用者審核 migration 並明確同意後，再安排 Supabase 測試專案的 Auth/RPC/RLS/Storage 聯調、故障與真實 Safari/Android 驗收。現階段無須在正式控制台執行任何 SQL。
+3. 使用者已完成正式 migration，**不要重跑**。先解除環境網路限制並確認專用測試帳號／資料範圍，再依真實驗收文件完成 Auth/RPC/RLS/Storage、故障與 Safari/Android 驗收。
 4. 完整第九階段仍是 WIP；未完成項目應分成後續可審查階段，不在此輪一次性完成。
 
 最初 WIP 的遠端 CI：資料庫 job 通過，Node 測試步驟失敗，後續瀏覽器步驟未執行；此時資源雜湊尚未更新。其後 `1e57397` 的完整 CI 已通過，見上節連結；新提交須獨立查看其 Checks。
 
-尚未完成：真實 Supabase RPC/Storage 聯調、真實多裝置與 iPadOS Safari 雲同步、完整應用/視覺回歸及整體第九階段驗收。正式資料庫未修改；既有本地與訪客資料不得刪除或搬移。
+尚未完成：真實 Supabase RPC/Storage 聯調、真實多裝置與 iPadOS Safari 雲同步、完整應用/視覺回歸及整體第九階段驗收。使用者已完成正式 migration；助手未執行正式 SQL，既有本地與訪客資料不得刪除或搬移。

@@ -302,10 +302,22 @@ Object.assign(globalThis.SumiMessages,{
     "en": "Your session needs verification. Sign in to the original account again. Existing local data is unchanged."
   },
   "sync.error.setup": {
-    "zh-CN": "云同步服务尚未就绪，请先按部署文档完成 Supabase migration 和权限设置。",
-    "zh-TW": "雲端同步服務尚未就緒，請先依部署文件完成 Supabase migration 與權限設定。",
-    "ja-JP": "同期サービスの準備ができていません。導入手順に従い Supabase の migration と権限設定を完了してください。",
-    "en": "Cloud sync is not ready. Complete the Supabase migration and permissions described in the setup guide."
+    "zh-CN": "云同步接口不可用，请按验收文档检查 API、函数与权限设置。不要直接重复执行数据库迁移或开放数据表写入。",
+    "zh-TW": "雲端同步介面無法使用，請依驗收文件檢查 API、函式與權限設定。不要直接重跑資料庫 migration 或開放資料表寫入。",
+    "ja-JP": "同期 API を利用できません。検証手順に沿って API、関数、権限を確認してください。移行 SQL の再実行やテーブルへの直接書き込み許可で対処しないでください。",
+    "en": "The sync API is unavailable. Follow the acceptance guide to check API, function and permission settings. Do not simply rerun migrations or enable direct table writes."
+  },
+  "sync.error.otherTab": {
+    "zh-CN": "此账号已在本浏览器的另一标签页中打开。请先在该页保存操作并关闭，再回到此页重试；本机数据和待同步操作均保留。",
+    "zh-TW": "此帳號已在本瀏覽器的另一分頁中開啟。請先在該頁儲存操作並關閉，再回到此頁重試；本機資料與待同步操作皆保留。",
+    "ja-JP": "このアカウントは同じブラウザの別タブで開いています。そちらで作業を保存してタブを閉じ、このタブで再試行してください。端末データと送信待ちの操作は保持されています。",
+    "en": "This account is open in another tab in this browser. Save your work there and close that tab, then retry here. Local data and pending changes are retained."
+  },
+  "sync.error.lockUnavailable": {
+    "zh-CN": "当前浏览器环境不支持安全同步所需的 Web Locks。请使用支持此功能的新版浏览器，通过 HTTPS 或本机 localhost 打开。请勿清除本机数据。",
+    "zh-TW": "目前瀏覽器環境不支援安全同步所需的 Web Locks。請使用支援此功能的新版瀏覽器，透過 HTTPS 或本機 localhost 開啟。請勿清除本機資料。",
+    "ja-JP": "この環境では安全な同期に必要な Web Locks を利用できません。対応する最新ブラウザで HTTPS または端末の localhost から開いてください。端末データは消去しないでください。",
+    "en": "This browser environment lacks the Web Locks required for safe sync. Use a current supported browser over HTTPS or local localhost. Do not clear local data."
   },
   "sync.error.permission": {
     "zh-CN": "云端拒绝了此次操作，请检查账号权限；本机数据未被删除。",

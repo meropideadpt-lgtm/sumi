@@ -4,6 +4,7 @@ from pathlib import Path
 import unittest
 from playwright.sync_api import expect
 from browser_support import Harness, ROOT
+from auth_support import AuthSite, URL
 
 COUNTS={'subscriptions':2,'payments':3,'costHistory':4,'preferences':4,'extensions':1,'images':1}
 PREVIEW={'id':'preview-1','localCounts':COUNTS,'cloudCounts':{**COUNTS,'subscriptions':0},'differences':2}
@@ -106,3 +107,72 @@ class SyncViewTests(unittest.TestCase):
         expect(p.locator('[data-sync-action]')).to_have_count(0)
         expect(p.locator('.sync-counts')).to_have_count(0)
         self.assertEqual(p.evaluate('calls'),[])
+
+    def test_lock_guidance_is_translated_and_readable_on_touch_in_both_themes(self):
+        for language in ['zh-CN','zh-TW','ja-JP','en']:
+            for code,key in [('sync-other-tab','otherTab'),('sync-lock-unavailable','lockUnavailable')]:
+                with self.subTest(language=language,code=code):
+                    p=self.page({'enabled':False,'status':'paused','error':code},language=language,width=390,touch=True)
+                    expected=p.evaluate('key=>SumiI18n.t("sync.error."+key)',key)
+                    expect(p.locator('[data-sync-error]')).to_have_text(expected)
+                    for theme in ['light','dark']:
+                        p.evaluate('theme=>document.documentElement.dataset.theme=theme',theme)
+                        expect(p.locator('[data-sync-error]')).to_be_visible()
+                        self.assertTrue(p.evaluate('document.documentElement.scrollWidth<=innerWidth'))
+                    p.context.close();self.contexts.remove(p.context)
+
+
+class SyncReadinessAppTests(unittest.TestCase):
+    """Real app/official SDK with mock Auth only; no real account or RPC."""
+    @classmethod
+    def setUpClass(cls):cls.h=Harness().__enter__()
+    @classmethod
+    def tearDownClass(cls):cls.h.__exit__()
+    def setUp(self):self.sites=[];self.cloud_calls=[]
+    def tearDown(self):
+        for site in self.sites:
+            site.close();self.assertEqual(site.errors,[])
+        self.assertEqual(self.cloud_calls,[], 'A lock failure must not issue private RPC')
+    def site(self,**kwargs):
+        site=AuthSite(self.h,**kwargs);self.sites.append(site)
+        def blocked(route):
+            self.cloud_calls.append(route.request.url);route.abort('blockedbyclient')
+        site.context.route(URL+'/rest/v1/**',blocked)
+        site.login();expect(site.page.locator('[data-add]')).to_be_visible()
+        site.page.locator('[data-nav=settings]').click()
+        site.page.locator('#language').select_option('en')
+        return site
+
+    def test_actual_second_tab_explains_pause_and_can_reclaim_after_owner_closes(self):
+        site=self.site()
+        original=site.page.evaluate("workspaceStorage.getItem('sumi-data-v1')")
+        second=site.new_page(self.h.url)
+        expect(second.locator('[data-add]')).to_be_visible()
+        second.locator('[data-nav=settings]').click()
+        expect(second.locator('[data-sync-error]')).to_contain_text('another tab')
+        self.assertEqual(second.evaluate('syncController.model().error'),'sync-other-tab')
+        self.assertEqual(second.evaluate("workspaceStorage.getItem('sumi-data-v1')"),original)
+        site.page.close()
+        second.locator('[data-sync-action=inspect]').click()
+        expect(second.locator('[data-add]')).to_be_visible()  # reclaim reloads current workspace
+        second.locator('[data-nav=settings]').click()
+        expect(second.locator('[data-sync-error]')).to_be_hidden()
+        self.assertTrue(second.evaluate('SumiSyncLock.isOwner()'))
+        self.assertEqual(second.evaluate("workspaceStorage.getItem('sumi-data-v1')"),original)
+
+    def test_unsupported_locks_explain_secure_context_and_keep_local_account_data(self):
+        site=self.site(init="Object.defineProperty(navigator,'locks',{value:undefined});")
+        expect(site.page.locator('[data-sync-error]')).to_contain_text('Web Locks')
+        expect(site.page.locator('[data-sync-error]')).to_contain_text('HTTPS')
+        site.page.locator('[data-nav=home]').click()
+        site.page.locator('[data-add]').click()
+        site.page.locator('#name').fill('Local account still usable')
+        site.page.locator('#amount').fill('1.23')
+        site.page.locator('#subscriptionForm [type=submit]').click()
+        expect(site.page.locator('#subscriptionForm')).to_have_count(0)
+        original=site.page.evaluate("workspaceStorage.getItem('sumi-data-v1')")
+        site.page.locator('[data-nav=settings]').click()
+        site.page.locator('[data-sync-action=inspect]').click()
+        expect(site.page.locator('[data-sync-error]')).to_contain_text('Web Locks')
+        self.assertEqual(site.page.evaluate("workspaceStorage.getItem('sumi-data-v1')"),original)
+        self.assertFalse(site.page.evaluate('syncController.model().enabled'))
